@@ -2,7 +2,9 @@ import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/ui/audio/audio_player_page.dart';
 import 'package:book_reader/ui/book/book_detail_page.dart';
 import 'package:book_reader/ui/book/bookshelf_page.dart';
+import 'package:book_reader/ui/book/discover_page.dart';
 import 'package:book_reader/ui/book/reader_page.dart';
+import 'package:book_reader/ui/book/reading_history_page.dart';
 import 'package:book_reader/ui/book_sources/book_sources_page.dart';
 import 'package:book_reader/ui/search/search_page.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +25,14 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/book-sources',
       builder: (context, state) => const BookSourcesPage(),
+    ),
+    GoRoute(
+      path: '/reading-history',
+      builder: (context, state) => const ReadingHistoryPage(),
+    ),
+    GoRoute(
+      path: '/discover',
+      builder: (context, state) => const DiscoverPage(),
     ),
     GoRoute(
       path: '/book',

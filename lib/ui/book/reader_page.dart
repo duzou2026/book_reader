@@ -6,6 +6,7 @@ import 'package:book_reader/data/bookshelf_repository.dart';
 import 'package:book_reader/data/models/book_info.dart';
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/data/notes_repository.dart';
+import 'package:book_reader/data/reading_history_repository.dart';
 import 'package:book_reader/domain/usecases/resolve_chapter_content.dart';
 import 'package:book_reader/services/preferences/reading_prefs_repository.dart';
 import 'package:book_reader/services/text/chinese_converter.dart';
@@ -423,6 +424,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
   void dispose() {
     _persistProgress();
     _persistReadingStats();
+    _persistReadingHistory();
     _stopTts();
     _stopAutoRead();
     _readingTimer?.cancel();
@@ -443,6 +445,30 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
           );
     } catch (_) {
       // 静默失败：统计不应影响阅读流程
+    }
+  }
+
+  /// 写入一条阅读历史记录（独立于书架）。
+  Future<void> _persistReadingHistory() async {
+    try {
+      final chapter = _currentChapter;
+      final entry = ReadingHistoryEntry(
+        id: '${DateTime.now().millisecondsSinceEpoch}|$_id',
+        bookId: _id,
+        bookName: _currentBook.name ?? '',
+        author: _currentBook.author ?? '',
+        coverUrl: _currentBook.coverUrl,
+        sourceName: _currentBook.sourceName,
+        sourceUrl: _currentBook.sourceUrl,
+        bookUrl: _currentBook.url,
+        chapterIndex: _currentIndex,
+        chapterName: chapter.name,
+        durationSeconds: _readingSeconds,
+        readAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      await ref.read(readingHistoryRepositoryProvider).add(entry);
+    } catch (_) {
+      // 静默失败：历史不应影响阅读流程
     }
   }
 

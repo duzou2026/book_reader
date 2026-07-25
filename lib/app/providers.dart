@@ -2,8 +2,11 @@ import 'package:book_reader/data/bookshelf_repository.dart';
 import 'package:book_reader/data/bookmarks_repository.dart';
 import 'package:book_reader/data/hive_book_source_repository.dart';
 import 'package:book_reader/data/notes_repository.dart';
+import 'package:book_reader/data/reading_history_repository.dart';
 import 'package:book_reader/data/reading_stats_repository.dart';
 import 'package:book_reader/data/search_history_repository.dart';
+import 'package:book_reader/domain/usecases/check_book_updates.dart';
+import 'package:book_reader/domain/usecases/discover_books.dart';
 import 'package:book_reader/domain/usecases/get_audio.dart';
 import 'package:book_reader/domain/usecases/get_book_info.dart';
 import 'package:book_reader/domain/usecases/get_chapter_content.dart';
@@ -75,6 +78,12 @@ final readingStatsBoxProvider = Provider<Box<String>>((ref) {
       'readingStatsBoxProvider 必须在 main.dart 中 override');
 });
 
+/// 阅读历史 Box。
+final readingHistoryBoxProvider = Provider<Box<String>>((ref) {
+  throw UnimplementedError(
+      'readingHistoryBoxProvider 必须在 main.dart 中 override');
+});
+
 final bookSourceRepositoryProvider = Provider<BookSourceRepository>((ref) {
   final box = ref.watch(bookSourceBoxProvider);
   return HiveBookSourceRepository(box);
@@ -117,6 +126,11 @@ final bookmarkRepositoryProvider = Provider<BookmarkRepository>((ref) {
 
 final readingStatsRepositoryProvider = Provider<ReadingStatsRepository>((ref) {
   return ReadingStatsRepository(ref.watch(readingStatsBoxProvider));
+});
+
+final readingHistoryRepositoryProvider =
+    Provider<ReadingHistoryRepository>((ref) {
+  return ReadingHistoryRepository(ref.watch(readingHistoryBoxProvider));
 });
 
 /// TTS 服务（默认 NoOp，移动端可 override 为 flutter_tts 实现）。
@@ -225,6 +239,23 @@ final testBookSourceProvider = Provider<TestBookSource>((ref) {
     bookInfoFetcher: ref.watch(bookInfoFetcherProvider),
     tocFetcher: ref.watch(tocFetcherProvider),
     contentFetcher: ref.watch(contentFetcherProvider),
+  );
+});
+
+/// 检查书架追更。
+final checkBookUpdatesProvider = Provider<CheckBookUpdates>((ref) {
+  return CheckBookUpdates(
+    getToc: ref.watch(getTocProvider),
+    repo: ref.watch(bookshelfRepositoryProvider),
+  );
+});
+
+/// 发现/排行用例。
+final discoverBooksProvider = Provider<DiscoverBooks>((ref) {
+  return DiscoverBooks(
+    aggregator: ref.watch(searchAggregatorProvider),
+    getEnabledSources: () =>
+        ref.watch(bookSourceRepositoryProvider).getEnabledSources(),
   );
 });
 

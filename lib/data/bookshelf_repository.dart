@@ -38,6 +38,9 @@ class BookshelfEntry {
   /// 加入书架时间（毫秒时间戳）。
   final int addedAt;
 
+  /// 所属分组名（空字符串表示未分组）。
+  final String group;
+
   const BookshelfEntry({
     required this.id,
     required this.bookName,
@@ -54,6 +57,7 @@ class BookshelfEntry {
     this.lastChapterName,
     required this.lastReadAt,
     required this.addedAt,
+    this.group = '',
   });
 
   Map<String, dynamic> toJson() => {
@@ -72,6 +76,7 @@ class BookshelfEntry {
         'lastChapterName': lastChapterName,
         'lastReadAt': lastReadAt,
         'addedAt': addedAt,
+        'group': group,
       };
 
   factory BookshelfEntry.fromJson(Map<String, dynamic> json) {
@@ -91,6 +96,7 @@ class BookshelfEntry {
       lastChapterName: json['lastChapterName'] as String?,
       lastReadAt: json['lastReadAt'] as int,
       addedAt: json['addedAt'] as int,
+      group: json['group'] as String? ?? '',
     );
   }
 
@@ -106,6 +112,7 @@ class BookshelfEntry {
     int? lastChapterIndex,
     String? lastChapterName,
     int? lastReadAt,
+    String? group,
   }) {
     return BookshelfEntry(
       id: id,
@@ -123,6 +130,7 @@ class BookshelfEntry {
       lastChapterName: lastChapterName ?? this.lastChapterName,
       lastReadAt: lastReadAt ?? this.lastReadAt,
       addedAt: addedAt,
+      group: group ?? this.group,
     );
   }
 
@@ -131,6 +139,15 @@ class BookshelfEntry {
     String norm(String s) =>
         s.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
     return '${norm(bookName)}|${norm(author)}';
+  }
+
+  /// 是否有未读更新：源端最新章节名存在，且与用户最近阅读章节名不同。
+  bool get hasUpdate {
+    final latest = lastChapter;
+    final read = lastChapterName;
+    if (latest == null || latest.isEmpty) return false;
+    if (read == null || read.isEmpty) return true;
+    return latest != read;
   }
 }
 
@@ -181,4 +198,50 @@ class BookshelfRepository {
       lastReadAt: DateTime.now().millisecondsSinceEpoch,
     ));
   }
+
+  /// 更新所属分组。传入空字符串表示移出分组。
+  Future<void> updateGroup({
+    required String id,
+    required String group,
+  }) async {
+    final entry = await getById(id);
+    if (entry == null) return;
+    await upsert(entry.copyWith(group: group));
+  }
+
+  /// 获取所有已使用的分组名（去重，按字母序）。
+  Future<List<String>> getAllGroups() async {
+    final all = await getAll();
+    final set = all.map((e) => e.group).where((g) => g.isNotEmpty).toSet();
+    final list = set.toList()..sort();
+    return list;
+  }
+
+  /// 更新源端最新章节名（用于更新提醒：检查追更）。
+  Future<void> updateLatestChapter({
+    required String id,
+    required String? latestChapter,
+  }) async {
+    final entry = await getById(id);
+    if (entry == null) return;
+    await upsert(entry.copyWith(lastChapter: latestChapter));
+  }
+}
+
+/// 书架排序方式。
+enum BookshelfSort {
+  /// 按最近阅读时间倒序。
+  recent,
+  /// 按加入时间倒序。
+  added,
+  /// 按书名升序。
+  title,
+}
+
+/// 书架视图模式。
+enum BookshelfViewMode {
+  /// 列表视图。
+  list,
+  /// 网格视图。
+  grid,
 }
