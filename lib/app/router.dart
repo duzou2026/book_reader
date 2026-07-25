@@ -1,4 +1,5 @@
 import 'package:book_reader/data/models/search_result.dart';
+import 'package:book_reader/ui/audio/audio_player_page.dart';
 import 'package:book_reader/ui/book/book_detail_page.dart';
 import 'package:book_reader/ui/book/reader_page.dart';
 import 'package:book_reader/ui/book_sources/book_sources_page.dart';
@@ -36,6 +37,16 @@ final appRouter = GoRouter(
           return const Scaffold(body: Center(child: Text('参数缺失')));
         }
         return ReaderPage(args: args);
+      },
+    ),
+    GoRoute(
+      path: '/audio',
+      builder: (context, state) {
+        final args = state.extra as AudioPlayerArgs?;
+        if (args == null) {
+          return const Scaffold(body: Center(child: Text('参数缺失')));
+        }
+        return AudioPlayerPage(args: args);
       },
     ),
   ],

@@ -1,6 +1,8 @@
 import 'package:book_reader/app/providers.dart';
+import 'package:book_reader/data/models/audio_chapter.dart';
 import 'package:book_reader/data/models/book_info.dart';
 import 'package:book_reader/data/models/search_result.dart';
+import 'package:book_reader/ui/audio/audio_player_page.dart';
 import 'package:book_reader/ui/book/reader_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +21,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   List<Chapter> _chapters = const [];
   bool _loadingInfo = true;
   bool _loadingToc = false;
+  bool _loadingAudio = false;
   String? _error;
 
   @override
@@ -58,6 +61,36 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       setState(() => _error = '目录加载失败: $e');
     } finally {
       if (mounted) setState(() => _loadingToc = false);
+    }
+  }
+
+  Future<void> _playAudio() async {
+    final info = _info;
+    if (info == null) return;
+    setState(() => _loadingAudio = true);
+    try {
+      final useCase = ref.read(getAudioTocProvider);
+      final audioChapters = await useCase(info);
+      if (!mounted) return;
+      if (audioChapters.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('该书源未配置有声目录规则，无法听书')),
+        );
+        return;
+      }
+      context.go('/audio',
+          extra: AudioPlayerArgs(
+            book: info,
+            chapters: audioChapters,
+            initialIndex: 0,
+          ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('听书加载失败: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingAudio = false);
     }
   }
 
@@ -174,12 +207,22 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                   dense: true,
                   title: Text('目录 (${_chapters.length})',
                       style: const TextStyle(fontWeight: FontWeight.w600)),
-                  trailing: _loadingToc
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : null,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_loadingToc)
+                        const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2)),
+                      if (_info != null && _chapters.isNotEmpty)
+                        TextButton.icon(
+                          icon: const Icon(Icons.headphones, size: 18),
+                          label: const Text('听书'),
+                          onPressed: _loadingAudio ? null : _playAudio,
+                        ),
+                    ],
+                  ),
                 ),
                 if (_error != null)
                   Padding(

@@ -1,7 +1,11 @@
 import 'package:book_reader/data/hive_book_source_repository.dart';
+import 'package:book_reader/domain/usecases/get_audio.dart';
 import 'package:book_reader/domain/usecases/get_book_info.dart';
 import 'package:book_reader/domain/usecases/get_chapter_content.dart';
 import 'package:book_reader/domain/usecases/search_books.dart';
+import 'package:book_reader/services/audio/audio_player_notifier.dart';
+import 'package:book_reader/services/audio/audio_toc_fetcher.dart';
+import 'package:book_reader/services/audio/audio_url_fetcher.dart';
 import 'package:book_reader/services/book_info/book_info_fetcher.dart';
 import 'package:book_reader/services/book_info/content_fetcher.dart';
 import 'package:book_reader/services/book_info/toc_fetcher.dart';
@@ -12,6 +16,7 @@ import 'package:book_reader/services/search/search_aggregator.dart';
 import 'package:book_reader/services/search/single_source_searcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
+import 'package:just_audio/just_audio.dart';
 
 /// 书源持久化 Box。在 main.dart 中通过 [ProviderScope.overrides] 注入。
 final bookSourceBoxProvider = Provider<Box<String>>((ref) {
@@ -91,5 +96,54 @@ final getChapterContentProvider = Provider<GetChapterContent>((ref) {
     fetcher: ref.watch(contentFetcherProvider),
     getEnabledSources: () =>
         ref.watch(bookSourceRepositoryProvider).getEnabledSources(),
+  );
+});
+
+final audioTocFetcherProvider = Provider<AudioTocFetcher>((ref) {
+  return AudioTocFetcher(
+    fetcher: ref.watch(fetcherProvider),
+    ruleEngine: ref.watch(ruleEngineProvider),
+  );
+});
+
+final audioUrlFetcherProvider = Provider<AudioUrlFetcher>((ref) {
+  return AudioUrlFetcher(
+    fetcher: ref.watch(fetcherProvider),
+    ruleEngine: ref.watch(ruleEngineProvider),
+  );
+});
+
+final getAudioTocProvider = Provider<GetAudioToc>((ref) {
+  return GetAudioToc(
+    fetcher: ref.watch(audioTocFetcherProvider),
+    getEnabledSources: () =>
+        ref.watch(bookSourceRepositoryProvider).getEnabledSources(),
+  );
+});
+
+final getAudioUrlProvider = Provider<GetAudioUrl>((ref) {
+  return GetAudioUrl(
+    fetcher: ref.watch(audioUrlFetcherProvider),
+    getEnabledSources: () =>
+        ref.watch(bookSourceRepositoryProvider).getEnabledSources(),
+  );
+});
+
+/// just_audio 的 [AudioPlayer] 单例。
+/// refDispose 时自动释放原生资源。
+final audioPlayerProvider = Provider<AudioPlayer>((ref) {
+  final player = AudioPlayer();
+  ref.onDispose(player.dispose);
+  return player;
+});
+
+/// 全局播放器状态 Notifier。
+final audioPlayerNotifierProvider =
+    StateNotifierProvider<AudioPlayerNotifier, AudioPlayerState>((ref) {
+  final player = ref.watch(audioPlayerProvider);
+  final getAudioUrl = ref.watch(getAudioUrlProvider);
+  return AudioPlayerNotifier(
+    player,
+    CallbackAudioUrlResolver((info, chapter) => getAudioUrl(info, chapter)),
   );
 });
