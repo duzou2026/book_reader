@@ -1,6 +1,7 @@
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/models/book_info.dart';
 import 'package:book_reader/data/models/search_result.dart';
+import 'package:book_reader/ui/book/reader_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -205,7 +206,12 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     enabled: !c.isVolume,
                     onTap: c.isVolume
                         ? null
-                        : () => context.go('/reader', extra: _ReaderArgs(info!, c, _chapters)),
+                        : () => context.go('/reader',
+                            extra: ReaderArgs(
+                              book: info!,
+                              chapters: _chapters,
+                              initialIndex: _chapters.indexOf(c),
+                            )),
                   ),
               ],
             ),
@@ -220,12 +226,4 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       child: const Icon(Icons.book, color: Colors.grey),
     );
   }
-}
-
-/// 阅读器入参：书籍信息 + 当前章节 + 完整目录（用于上/下章切换）。
-class _ReaderArgs {
-  final BookInfo info;
-  final Chapter chapter;
-  final List<Chapter> chapters;
-  _ReaderArgs(this.info, this.chapter, this.chapters);
 }

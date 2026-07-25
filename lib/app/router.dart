@@ -1,6 +1,6 @@
-import 'package:book_reader/data/models/book_info.dart';
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/ui/book/book_detail_page.dart';
+import 'package:book_reader/ui/book/reader_page.dart';
 import 'package:book_reader/ui/book_sources/book_sources_page.dart';
 import 'package:book_reader/ui/search/search_page.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +26,16 @@ final appRouter = GoRouter(
           return const Scaffold(body: Center(child: Text('参数缺失')));
         }
         return BookDetailPage(searchResult: result);
+      },
+    ),
+    GoRoute(
+      path: '/reader',
+      builder: (context, state) {
+        final args = state.extra as ReaderArgs?;
+        if (args == null) {
+          return const Scaffold(body: Center(child: Text('参数缺失')));
+        }
+        return ReaderPage(args: args);
       },
     ),
   ],
