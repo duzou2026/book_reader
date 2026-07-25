@@ -157,6 +157,14 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       ..sort((a, b) => a.sourceName.compareTo(b.sourceName));
   }
 
+  /// 当前结果是否来自 Mock 兜底（所有源的 URL 都是 mock://）。
+  bool get _isMockResults {
+    if (_rawResults.isEmpty) return false;
+    return _rawResults.every(
+      (r) => r.sources.every((s) => s.sourceUrl.startsWith('mock://')),
+    );
+  }
+
   /// 提取所有出现过的分类。
   List<String> get _availableKinds {
     final set = <String>{};
@@ -258,6 +266,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 ),
               ),
             ),
+          // Mock 兜底数据提示条
+          if (_isMockResults && !_loading) _buildMockBanner(),
           // 搜索进度条
           if (_loading && _progress != null) _buildProgressBar(),
           if (_error != null) _buildErrorBanner(),
@@ -472,6 +482,48 @@ class _SearchPageState extends ConsumerState<SearchPage> {
         child: Text(
           _error!,
           style: TextStyle(color: Theme.of(context).colorScheme.error),
+        ),
+      ),
+    );
+  }
+
+  /// Mock 兜底结果提示：当前显示的是演示数据，引导用户导入真实书源。
+  Widget _buildMockBanner() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Material(
+        color: Colors.teal.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline,
+                  size: 16, color: Colors.teal),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '演示数据：导入真实书源后可获取实际搜索结果',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: ThemeColors.mutedText(context),
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => context.go('/book-sources'),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 28),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('导入书源',
+                    style: TextStyle(fontSize: 11, color: Colors.teal)),
+              ),
+            ],
+          ),
         ),
       ),
     );

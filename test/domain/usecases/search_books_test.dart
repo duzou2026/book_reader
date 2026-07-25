@@ -51,7 +51,8 @@ void main() {
   });
 
   group('SearchBooks use case', () {
-    test('returns empty when repository has no sources', () async {
+    test('falls back to mock results when repository has no sources',
+        () async {
       final useCase = SearchBooks(
         aggregator: SearchAggregator(
           searcher: SingleSourceSearcher(
@@ -63,7 +64,46 @@ void main() {
       );
 
       final results = await useCase('三体');
-      expect(results, isEmpty);
+      // 无启用书源时，走 MockSearchFallback 兜底
+      expect(results, isNotEmpty);
+      expect(results.every((r) =>
+          r.sources.every((s) => s.sourceUrl.startsWith('mock://'))), isTrue);
+      // 兜底结果书名应包含关键字
+      expect(results.every((r) => r.bookName.contains('三体')), isTrue);
+    });
+
+    test('falls back to mock results when sources return empty', () async {
+      final source = BookSource(
+        bookSourceName: '空源',
+        bookSourceUrl: 'https://empty.com',
+        searchUrl: 'https://empty.com/search?q={{key}}',
+        ruleSearch: const RuleSearch(
+          bookList: 'css:.book-list > li',
+          name: 'css:.title@text',
+          author: 'css:.author@text',
+          bookUrl: 'css:.title@href',
+        ),
+      );
+
+      final fetcher = _FakeFetcher({
+        'https://empty.com/search?q=%E4%B8%89%E4%BD%93': '<ul class="book-list"></ul>',
+      });
+
+      final useCase = SearchBooks(
+        aggregator: SearchAggregator(
+          searcher: SingleSourceSearcher(
+            fetcher: fetcher,
+            ruleEngine: engine,
+          ),
+        ),
+        repository: _FakeRepository([source]),
+      );
+
+      final results = await useCase('三体');
+      // 真实源返回空 → 走 MockSearchFallback 兜底
+      expect(results, isNotEmpty);
+      expect(results.every((r) =>
+          r.sources.every((s) => s.sourceUrl.startsWith('mock://'))), isTrue);
     });
 
     test('aggregates results from repository sources', () async {
@@ -101,6 +141,12 @@ void main() {
       expect(results.length, 1);
       expect(results.first.bookName, '三体');
       expect(results.first.author, '刘慈欣');
+      // 命中真实源时，不应包含 mock 兜底结果
+      expect(
+        results.every(
+            (r) => r.sources.every((s) => s.sourceUrl.startsWith('mock://'))),
+        isFalse,
+      );
     });
   });
 }

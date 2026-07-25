@@ -14,17 +14,38 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 /// 全局路由配置。
+///
+/// - 主导航（书架/搜书）使用 [ShellRoute] + 底部 [NavigationBar]，
+///   保证在书架和搜书间切换时不丢失页面状态。
+/// - 详情页 `/book` 也包含在 Shell 内，方便用户随时切回书架。
+/// - 其他次级页面（书源管理、阅读器、设置等）作为全屏独立路由。
 final appRouter = GoRouter(
-  initialLocation: '/shelf',
+  initialLocation: '/search',
   routes: [
-    GoRoute(
-      path: '/shelf',
-      builder: (context, state) => const BookshelfPage(),
+    ShellRoute(
+      builder: (context, state, child) => _HomeShell(child: child),
+      routes: [
+        GoRoute(
+          path: '/shelf',
+          builder: (context, state) => const BookshelfPage(),
+        ),
+        GoRoute(
+          path: '/search',
+          builder: (context, state) => const SearchPage(),
+        ),
+        GoRoute(
+          path: '/book',
+          builder: (context, state) {
+            final result = state.extra as SearchResult?;
+            if (result == null) {
+              return const Scaffold(body: Center(child: Text('参数缺失')));
+            }
+            return BookDetailPage(searchResult: result);
+          },
+        ),
+      ],
     ),
-    GoRoute(
-      path: '/search',
-      builder: (context, state) => const SearchPage(),
-    ),
+    // 书源管理：全屏页面，从搜书页 AppBar 进入
     GoRoute(
       path: '/book-sources',
       builder: (context, state) => const BookSourcesPage(),
@@ -49,16 +70,6 @@ final appRouter = GoRouter(
       builder: (context, state) => const SettingsPage(),
     ),
     GoRoute(
-      path: '/book',
-      builder: (context, state) {
-        final result = state.extra as SearchResult?;
-        if (result == null) {
-          return const Scaffold(body: Center(child: Text('参数缺失')));
-        }
-        return BookDetailPage(searchResult: result);
-      },
-    ),
-    GoRoute(
       path: '/reader',
       builder: (context, state) {
         final args = state.extra as ReaderArgs?;
@@ -80,3 +91,54 @@ final appRouter = GoRouter(
     ),
   ],
 );
+
+/// 主页底部导航容器：书架 / 搜书。
+///
+/// 详情页 /book 也包含在 Shell 内，方便用户随时切到书架查看收藏。
+class _HomeShell extends StatelessWidget {
+  final Widget child;
+  const _HomeShell({required this.child});
+
+  /// 底部导航 tab：路径前缀 + 图标。
+  static const _tabs = <(String, IconData)>[
+    ('/shelf', Icons.bookmark),
+    ('/search', Icons.search),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).matchedLocation;
+    // 详情页 /book 不属于任何 tab，回落到搜书（更常见的来源）
+    int idx = _tabs.indexWhere((t) => location.startsWith(t.$1));
+    if (idx < 0) idx = 1; // 默认搜书
+    return Scaffold(
+      body: child,
+      bottomNavigationBar: Theme(
+        data: Theme.of(context).copyWith(
+          navigationBarTheme: NavigationBarThemeData(
+            height: 56,
+            labelTextStyle: WidgetStatePropertyAll(
+              TextStyle(fontSize: 10, height: 1.0),
+            ),
+          ),
+        ),
+        child: NavigationBar(
+          selectedIndex: idx,
+          onDestinationSelected: (i) => context.go(_tabs[i].$1),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.bookmark_border, size: 20),
+              selectedIcon: Icon(Icons.bookmark, size: 20),
+              label: '书架',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.search, size: 20),
+              selectedIcon: Icon(Icons.search, size: 20),
+              label: '搜书',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import 'package:book_reader/app/providers.dart';
+import 'package:book_reader/data/demo_book_sources.dart';
 import 'package:book_reader/data/models/book_source.dart';
+import 'package:book_reader/services/book_source/book_source_importer.dart';
 import 'package:book_reader/ui/book_sources/book_source_import_dialog.dart';
 import 'package:book_reader/ui/book_sources/book_source_test_sheet.dart';
 import 'package:book_reader/ui/common/theme_colors.dart';
@@ -51,6 +53,55 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
       setState(_reload);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已导入 $count 个书源')),
+      );
+    }
+  }
+
+  /// 一键导入内置推荐书源 JSON（legado 兼容格式）。
+  ///
+  /// 与「粘贴 JSON 导入」对话框的区别：
+  /// - 这里直接使用 [recommendedBookSourceJson] 中的模板，无需用户复制粘贴
+  /// - 用户可在导入后再编辑具体规则或替换为最新订阅
+  Future<void> _importRecommended() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('导入推荐书源', style: TextStyle(fontSize: 16)),
+        content: const Text(
+          '将导入 2 个内置推荐书源模板（笔趣阁、起点中文网），'
+          '导入后可在书源管理页编辑具体规则或替换为最新 legado 书源订阅链接。',
+          style: TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('导入'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final sources = BookSourceImporter()
+          .parse(recommendedBookSourceJson, throwOnInvalid: false);
+      final repo = ref.read(bookSourceRepositoryProvider);
+      for (final s in sources) {
+        await repo.upsert(s);
+      }
+      if (!mounted) return;
+      setState(_reload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已导入 ${sources.length} 个推荐书源')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('导入失败：$e')),
       );
     }
   }
@@ -427,6 +478,11 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                   tooltip: '新建书源',
                 ),
                 IconButton(
+                  icon: const Icon(Icons.recommend_outlined),
+                  onPressed: _importRecommended,
+                  tooltip: '导入推荐书源',
+                ),
+                IconButton(
                   icon: const Icon(Icons.ios_share),
                   onPressed: () => _exportSources(_lastList, onlySelected: false),
                   tooltip: '导出全部',
@@ -434,7 +490,7 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                 IconButton(
                   icon: const Icon(Icons.add),
                   onPressed: _openImport,
-                  tooltip: '导入书源',
+                  tooltip: '粘贴 JSON 导入',
                 ),
               ],
       ),
@@ -456,9 +512,15 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                   const Text('还没有书源'),
                   const SizedBox(height: 12),
                   FilledButton.icon(
+                    onPressed: _importRecommended,
+                    icon: const Icon(Icons.recommend_outlined),
+                    label: const Text('导入推荐书源'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
                     onPressed: _openImport,
-                    icon: const Icon(Icons.add),
-                    label: const Text('导入书源'),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('粘贴 JSON 导入'),
                   ),
                 ],
               ),

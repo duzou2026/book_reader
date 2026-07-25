@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/app/router.dart';
+import 'package:book_reader/data/demo_book_sources.dart';
 import 'package:book_reader/services/preferences/theme_prefs_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,6 +27,8 @@ Future<void> main() async {
   final readingStatsBox = await Hive.openBox<String>('reading_stats');
   final readingHistoryBox = await Hive.openBox<String>('reading_history');
   final chapterCacheBox = await Hive.openBox<String>('chapter_cache');
+  // 首次启动：内置 demo 书源（disabled + demo 分组），让 App 不空
+  await _seedDemoBookSources(bookSourceBox);
   runApp(
     ProviderScope(
       overrides: [
@@ -41,6 +46,17 @@ Future<void> main() async {
       child: const BookReaderApp(),
     ),
   );
+}
+
+/// 仅在 `book_sources` Box 为空时写入 demo 书源。
+///
+/// 已经导入过书源（或曾经手动删除过 demo 书源）的用户不会再次写入，
+/// 避免覆盖用户的现有配置。
+Future<void> _seedDemoBookSources(Box<String> box) async {
+  if (box.isNotEmpty) return;
+  for (final s in demoBookSources) {
+    await box.put(s.bookSourceUrl, jsonEncode(s.toJson()));
+  }
 }
 
 class BookReaderApp extends ConsumerWidget {
