@@ -2,12 +2,14 @@ import 'package:book_reader/data/hive_book_source_repository.dart';
 import 'package:book_reader/domain/usecases/get_audio.dart';
 import 'package:book_reader/domain/usecases/get_book_info.dart';
 import 'package:book_reader/domain/usecases/get_chapter_content.dart';
+import 'package:book_reader/domain/usecases/resolve_chapter_content.dart';
 import 'package:book_reader/domain/usecases/search_books.dart';
 import 'package:book_reader/services/audio/audio_player_notifier.dart';
 import 'package:book_reader/services/audio/audio_toc_fetcher.dart';
 import 'package:book_reader/services/audio/audio_url_fetcher.dart';
 import 'package:book_reader/services/book_info/book_info_fetcher.dart';
 import 'package:book_reader/services/book_info/content_fetcher.dart';
+import 'package:book_reader/services/book_info/cross_source_content_resolver.dart';
 import 'package:book_reader/services/book_info/toc_fetcher.dart';
 import 'package:book_reader/services/http/book_source_fetcher.dart';
 import 'package:book_reader/services/http/dio_book_source_fetcher.dart';
@@ -96,6 +98,23 @@ final getChapterContentProvider = Provider<GetChapterContent>((ref) {
     fetcher: ref.watch(contentFetcherProvider),
     getEnabledSources: () =>
         ref.watch(bookSourceRepositoryProvider).getEnabledSources(),
+  );
+});
+
+final crossSourceContentResolverProvider = Provider<CrossSourceContentResolver>(
+    (ref) {
+  return CrossSourceContentResolver(
+    tocFetcher: ref.watch(tocFetcherProvider),
+    contentFetcher: ref.watch(contentFetcherProvider),
+    getEnabledSources: () =>
+        ref.watch(bookSourceRepositoryProvider).getEnabledSources(),
+  );
+});
+
+final resolveChapterContentProvider = Provider<ResolveChapterContent>((ref) {
+  return ResolveChapterContent(
+    getContent: ref.watch(getChapterContentProvider),
+    resolver: ref.watch(crossSourceContentResolverProvider),
   );
 });
 

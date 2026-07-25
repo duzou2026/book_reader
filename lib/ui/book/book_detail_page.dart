@@ -1,5 +1,4 @@
 import 'package:book_reader/app/providers.dart';
-import 'package:book_reader/data/models/audio_chapter.dart';
 import 'package:book_reader/data/models/book_info.dart';
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/ui/audio/audio_player_page.dart';
@@ -254,6 +253,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                               book: info!,
                               chapters: _chapters,
                               initialIndex: _chapters.indexOf(c),
+                              alternatives: _buildAlternatives(),
                             )),
                   ),
               ],
@@ -268,5 +268,23 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       color: Colors.grey.shade200,
       child: const Icon(Icons.book, color: Colors.grey),
     );
+  }
+
+  /// 构造备选书源列表（去除当前书源）。
+  ///
+  /// 用搜索结果中的多源信息构造最小 [BookInfo]，
+  /// 供 ReaderPage 在遇到 VIP 章节时尝试跨源回退。
+  List<BookInfo> _buildAlternatives() {
+    final currentUrl = _info?.sourceUrl ?? widget.searchResult.sources.first.sourceUrl;
+    return widget.searchResult.sources
+        .where((s) => s.sourceUrl != currentUrl)
+        .map((s) => BookInfo(
+              url: s.bookUrl,
+              sourceName: s.sourceName,
+              sourceUrl: s.sourceUrl,
+              name: widget.searchResult.bookName,
+              author: widget.searchResult.author,
+            ))
+        .toList();
   }
 }
