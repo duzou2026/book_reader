@@ -28,9 +28,20 @@ class SearchBooks {
 
   SearchBooks({required this.aggregator, required this.repository});
 
-  Future<List<SearchResult>> call(String keyword) async {
+  Future<List<SearchResult>> call(
+    String keyword, {
+    void Function(SearchProgress)? onProgress,
+  }) async {
     final sources = await repository.getEnabledSources();
-    if (sources.isEmpty) return const [];
-    return aggregator.search(keyword, sources);
+    if (sources.isEmpty) {
+      onProgress?.call(const SearchProgress(
+        completed: 0,
+        total: 0,
+        sourceStatus: {},
+        resultCount: 0,
+      ));
+      return const [];
+    }
+    return aggregator.search(keyword, sources, onProgress: onProgress);
   }
 }

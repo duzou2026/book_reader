@@ -16,6 +16,8 @@ Future<void> main() async {
       await Hive.openBox<String>('reading_progress');
   final readingPrefsBox =
       await Hive.openBox<String>('reading_prefs');
+  final searchHistoryBox =
+      await Hive.openBox<String>('search_history');
   runApp(
     ProviderScope(
       overrides: [
@@ -23,6 +25,7 @@ Future<void> main() async {
         bookshelfBoxProvider.overrideWithValue(bookshelfBox),
         readingProgressBoxProvider.overrideWithValue(readingProgressBox),
         readingPrefsBoxProvider.overrideWithValue(readingPrefsBox),
+        searchHistoryBoxProvider.overrideWithValue(searchHistoryBox),
       ],
       child: const BookReaderApp(),
     ),

@@ -1,10 +1,12 @@
 import 'package:book_reader/data/bookshelf_repository.dart';
 import 'package:book_reader/data/hive_book_source_repository.dart';
+import 'package:book_reader/data/search_history_repository.dart';
 import 'package:book_reader/domain/usecases/get_audio.dart';
 import 'package:book_reader/domain/usecases/get_book_info.dart';
 import 'package:book_reader/domain/usecases/get_chapter_content.dart';
 import 'package:book_reader/domain/usecases/resolve_chapter_content.dart';
 import 'package:book_reader/domain/usecases/search_books.dart';
+import 'package:book_reader/domain/usecases/test_book_source.dart';
 import 'package:book_reader/services/audio/audio_player_notifier.dart';
 import 'package:book_reader/services/audio/audio_toc_fetcher.dart';
 import 'package:book_reader/services/audio/audio_url_fetcher.dart';
@@ -45,6 +47,12 @@ final readingPrefsBoxProvider = Provider<Box<String>>((ref) {
       'readingPrefsBoxProvider 必须在 main.dart 中 override');
 });
 
+/// 搜索历史 Box。
+final searchHistoryBoxProvider = Provider<Box<String>>((ref) {
+  throw UnimplementedError(
+      'searchHistoryBoxProvider 必须在 main.dart 中 override');
+});
+
 final bookSourceRepositoryProvider = Provider<BookSourceRepository>((ref) {
   final box = ref.watch(bookSourceBoxProvider);
   return HiveBookSourceRepository(box);
@@ -65,6 +73,16 @@ final readingPrefsRepositoryProvider =
     Provider<ReadingPrefsRepository>((ref) {
   final box = ref.watch(readingPrefsBoxProvider);
   return ReadingPrefsRepository(box);
+});
+
+final searchHistoryRepositoryProvider =
+    Provider<SearchHistoryRepository>((ref) {
+  final box = ref.watch(searchHistoryBoxProvider);
+  return SearchHistoryRepository(box);
+});
+
+final hotKeywordsRepositoryProvider = Provider<HotKeywordsRepository>((ref) {
+  return HotKeywordsRepository(ref.watch(searchHistoryRepositoryProvider));
 });
 
 /// 全局阅读偏好（响应式）：所有页面共享同一份偏好。
@@ -159,6 +177,15 @@ final resolveChapterContentProvider = Provider<ResolveChapterContent>((ref) {
   return ResolveChapterContent(
     getContent: ref.watch(getChapterContentProvider),
     resolver: ref.watch(crossSourceContentResolverProvider),
+  );
+});
+
+final testBookSourceProvider = Provider<TestBookSource>((ref) {
+  return TestBookSource(
+    searcher: ref.watch(singleSourceSearcherProvider),
+    bookInfoFetcher: ref.watch(bookInfoFetcherProvider),
+    tocFetcher: ref.watch(tocFetcherProvider),
+    contentFetcher: ref.watch(contentFetcherProvider),
   );
 });
 
