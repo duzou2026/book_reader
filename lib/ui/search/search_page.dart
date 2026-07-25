@@ -197,7 +197,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           IconButton(
             icon: const Icon(Icons.library_books_outlined),
             tooltip: '书源管理',
-            onPressed: () => context.go('/book-sources'),
+            onPressed: () => context.push('/book-sources'),
           ),
         ],
       ),
@@ -512,7 +512,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 ),
               ),
               TextButton(
-                onPressed: () => context.go('/book-sources'),
+                onPressed: () => context.push('/book-sources'),
                 style: TextButton.styleFrom(
                   minimumSize: const Size(0, 28),
                   padding:
@@ -655,7 +655,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             ),
             const SizedBox(height: 16),
             FilledButton.tonalIcon(
-              onPressed: () => context.go('/book-sources'),
+              onPressed: () => context.push('/book-sources'),
               icon: const Icon(Icons.library_books_outlined, size: 18),
               label: const Text('去书源管理'),
             ),

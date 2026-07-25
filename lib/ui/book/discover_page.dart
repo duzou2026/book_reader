@@ -67,7 +67,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   }
 
   void _openBook(SearchResult r) {
-    context.go('/book', extra: r);
+    context.push('/book', extra: r);
   }
 
   @override
@@ -173,7 +173,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                 style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12)),
             const SizedBox(height: 16),
             FilledButton.tonalIcon(
-              onPressed: () => context.go('/book-sources'),
+              onPressed: () => context.push('/book-sources'),
               icon: const Icon(Icons.library_books),
               label: const Text('去书源管理'),
             ),

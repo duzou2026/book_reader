@@ -13,7 +13,7 @@ class SearchResultTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: InkWell(
-        onTap: () => context.go('/book', extra: result),
+        onTap: () => context.push('/book', extra: result),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12),

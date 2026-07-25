@@ -90,7 +90,7 @@ class _ReadingHistoryPageState extends ConsumerState<ReadingHistoryPage>
         ),
       ],
     );
-    context.go('/book', extra: sr);
+    context.push('/book', extra: sr);
   }
 
   String _formatTime(int ms) {

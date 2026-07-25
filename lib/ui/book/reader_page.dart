@@ -4,7 +4,6 @@ import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/bookmarks_repository.dart';
 import 'package:book_reader/data/bookshelf_repository.dart';
 import 'package:book_reader/data/models/book_info.dart';
-import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/data/notes_repository.dart';
 import 'package:book_reader/data/reading_history_repository.dart';
 import 'package:book_reader/domain/usecases/resolve_chapter_content.dart';
@@ -1162,24 +1161,15 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
   }
 
   /// 退出阅读：返回到详情页。
+  ///
+  /// 阅读器由详情页 [context.push] 进入，这里直接 pop 即可回到详情页，
+  /// 保留详情页的目录/进度状态。若栈为空（异常情况）则回退到搜书根页。
   void _exit() {
-    context.go('/book',
-        extra: SearchResult(
-          bookName: _currentBook.name ?? '',
-          author: _currentBook.author ?? '',
-          coverUrl: _currentBook.coverUrl,
-          intro: _currentBook.intro,
-          kind: _currentBook.kind,
-          wordCount: _currentBook.wordCount,
-          lastChapter: _currentBook.lastChapter,
-          sources: [
-            SearchSource(
-              sourceName: _currentBook.sourceName,
-              sourceUrl: _currentBook.sourceUrl,
-              bookUrl: _currentBook.url,
-            ),
-          ],
-        ));
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/search');
+    }
   }
 
   /// 章节抽屉。

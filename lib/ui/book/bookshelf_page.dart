@@ -116,7 +116,7 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
         ),
       ],
     );
-    context.go('/book', extra: sr);
+    context.push('/book', extra: sr);
   }
 
   String _formatTime(int ms) {
@@ -270,12 +270,12 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: '阅读历史',
-            onPressed: () => context.go('/reading-history'),
+            onPressed: () => context.push('/reading-history'),
           ),
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: '设置',
-            onPressed: () => context.go('/settings'),
+            onPressed: () => context.push('/settings'),
           ),
           PopupMenuButton<BookshelfSort>(
             icon: const Icon(Icons.sort),

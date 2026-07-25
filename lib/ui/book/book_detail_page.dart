@@ -240,7 +240,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
         );
         return;
       }
-      context.go('/audio',
+      context.push('/audio',
           extra: AudioPlayerArgs(
             book: info,
             chapters: audioChapters,
@@ -359,7 +359,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   void _openReader(int chapterIndex) {
     final info = _info;
     if (info == null) return;
-    context.go('/reader',
+    context.push('/reader',
         extra: ReaderArgs(
           book: info,
           chapters: _chapters,
@@ -435,7 +435,13 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/search'),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/search');
+            }
+          },
         ),
         title: Text(name),
       ),
@@ -602,7 +608,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                           // 若有续读进度，从上次章节开始；否则从第一章开始
                           final start = (_entry?.lastChapterIndex ?? 0)
                               .clamp(0, _chapters.length - 1);
-                          context.go('/reader',
+                          context.push('/reader',
                               extra: ReaderArgs(
                                 book: info2,
                                 chapters: _chapters,
@@ -710,7 +716,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   Widget _relatedBookCard(SearchResult r) {
     final cover = r.coverUrl;
     return InkWell(
-      onTap: () => context.go('/book', extra: r),
+      onTap: () => context.push('/book', extra: r),
       borderRadius: BorderRadius.circular(6),
       child: SizedBox(
         width: 96,

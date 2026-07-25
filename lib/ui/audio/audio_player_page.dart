@@ -1,7 +1,6 @@
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/models/audio_chapter.dart';
 import 'package:book_reader/data/models/book_info.dart';
-import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -48,8 +47,13 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/book',
-              extra: _toSearchResult(widget.args.book)),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/search');
+            }
+          },
         ),
         title: Text(chapter?.name ?? '听书',
             style: const TextStyle(fontSize: 14)),
@@ -214,24 +218,5 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$m:$s';
-  }
-
-  SearchResult _toSearchResult(BookInfo info) {
-    return SearchResult(
-      bookName: info.name ?? '',
-      author: info.author ?? '',
-      coverUrl: info.coverUrl,
-      intro: info.intro,
-      kind: info.kind,
-      wordCount: info.wordCount,
-      lastChapter: info.lastChapter,
-      sources: [
-        SearchSource(
-          sourceName: info.sourceName,
-          sourceUrl: info.sourceUrl,
-          bookUrl: info.url,
-        ),
-      ],
-    );
   }
 }

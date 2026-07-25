@@ -477,7 +477,13 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
               )
             : IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.go('/search'),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/search');
+                  }
+                },
               ),
         title: _selectMode
             ? Text('已选 ${_selected.length} 项')
