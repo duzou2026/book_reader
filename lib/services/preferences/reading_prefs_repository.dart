@@ -21,13 +21,39 @@ class ReadingPrefs {
   /// 是否跟随系统主题（夜间模式）。
   final bool followSystemDark;
 
+  /// 字体索引（0=系统默认 / 1=衬线 / 2=无衬线 / 3=等宽）。
+  final int fontFamilyIndex;
+
+  /// 屏幕亮度（0.0-1.0），null 表示跟随系统。
+  final double? brightness;
+
+  /// 自动阅读速度（每分钟滚动行数，0=关闭）。
+  final int autoReadSpeed;
+
+  /// TTS 语速（0.5-2.0）。
+  final double ttsRate;
+
+  /// TTS 音调（0.5-2.0）。
+  final double ttsPitch;
+
+  /// 是否繁体显示。
+  final bool traditionalChinese;
+
   const ReadingPrefs({
     this.fontSize = 18,
     this.lineHeight = 1.7,
     this.backgroundIndex = 0,
     this.pageMode = PageMode.scroll,
     this.followSystemDark = false,
+    this.fontFamilyIndex = 0,
+    this.brightness,
+    this.autoReadSpeed = 0,
+    this.ttsRate = 1.0,
+    this.ttsPitch = 1.0,
+    this.traditionalChinese = false,
   });
+
+  bool get autoReadEnabled => autoReadSpeed > 0;
 
   Map<String, dynamic> toJson() => {
         'fontSize': fontSize,
@@ -35,6 +61,12 @@ class ReadingPrefs {
         'backgroundIndex': backgroundIndex,
         'pageMode': pageMode.name,
         'followSystemDark': followSystemDark,
+        'fontFamilyIndex': fontFamilyIndex,
+        'brightness': brightness,
+        'autoReadSpeed': autoReadSpeed,
+        'ttsRate': ttsRate,
+        'ttsPitch': ttsPitch,
+        'traditionalChinese': traditionalChinese,
       };
 
   factory ReadingPrefs.fromJson(Map<String, dynamic> json) {
@@ -47,6 +79,12 @@ class ReadingPrefs {
         orElse: () => PageMode.scroll,
       ),
       followSystemDark: json['followSystemDark'] as bool? ?? false,
+      fontFamilyIndex: json['fontFamilyIndex'] as int? ?? 0,
+      brightness: (json['brightness'] as num?)?.toDouble(),
+      autoReadSpeed: json['autoReadSpeed'] as int? ?? 0,
+      ttsRate: (json['ttsRate'] as num?)?.toDouble() ?? 1.0,
+      ttsPitch: (json['ttsPitch'] as num?)?.toDouble() ?? 1.0,
+      traditionalChinese: json['traditionalChinese'] as bool? ?? false,
     );
   }
 
@@ -56,6 +94,12 @@ class ReadingPrefs {
     int? backgroundIndex,
     PageMode? pageMode,
     bool? followSystemDark,
+    int? fontFamilyIndex,
+    Object? brightness,
+    int? autoReadSpeed,
+    double? ttsRate,
+    double? ttsPitch,
+    bool? traditionalChinese,
   }) {
     return ReadingPrefs(
       fontSize: fontSize ?? this.fontSize,
@@ -63,6 +107,14 @@ class ReadingPrefs {
       backgroundIndex: backgroundIndex ?? this.backgroundIndex,
       pageMode: pageMode ?? this.pageMode,
       followSystemDark: followSystemDark ?? this.followSystemDark,
+      fontFamilyIndex: fontFamilyIndex ?? this.fontFamilyIndex,
+      brightness: brightness == null
+          ? this.brightness
+          : (brightness is double ? brightness : null),
+      autoReadSpeed: autoReadSpeed ?? this.autoReadSpeed,
+      ttsRate: ttsRate ?? this.ttsRate,
+      ttsPitch: ttsPitch ?? this.ttsPitch,
+      traditionalChinese: traditionalChinese ?? this.traditionalChinese,
     );
   }
 }
@@ -132,6 +184,36 @@ class ReadingPrefsNotifier extends StateNotifier<ReadingPrefs> {
 
   Future<void> setFollowSystemDark(bool v) async {
     state = state.copyWith(followSystemDark: v);
+    await _repo.save(state);
+  }
+
+  Future<void> setFontFamilyIndex(int i) async {
+    state = state.copyWith(fontFamilyIndex: i);
+    await _repo.save(state);
+  }
+
+  Future<void> setBrightness(double? v) async {
+    state = state.copyWith(brightness: v);
+    await _repo.save(state);
+  }
+
+  Future<void> setAutoReadSpeed(int v) async {
+    state = state.copyWith(autoReadSpeed: v);
+    await _repo.save(state);
+  }
+
+  Future<void> setTtsRate(double v) async {
+    state = state.copyWith(ttsRate: v);
+    await _repo.save(state);
+  }
+
+  Future<void> setTtsPitch(double v) async {
+    state = state.copyWith(ttsPitch: v);
+    await _repo.save(state);
+  }
+
+  Future<void> setTraditionalChinese(bool v) async {
+    state = state.copyWith(traditionalChinese: v);
     await _repo.save(state);
   }
 }

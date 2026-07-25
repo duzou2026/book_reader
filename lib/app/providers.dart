@@ -1,5 +1,8 @@
 import 'package:book_reader/data/bookshelf_repository.dart';
+import 'package:book_reader/data/bookmarks_repository.dart';
 import 'package:book_reader/data/hive_book_source_repository.dart';
+import 'package:book_reader/data/notes_repository.dart';
+import 'package:book_reader/data/reading_stats_repository.dart';
 import 'package:book_reader/data/search_history_repository.dart';
 import 'package:book_reader/domain/usecases/get_audio.dart';
 import 'package:book_reader/domain/usecases/get_book_info.dart';
@@ -16,8 +19,9 @@ import 'package:book_reader/services/book_info/cross_source_content_resolver.dar
 import 'package:book_reader/services/book_info/toc_fetcher.dart';
 import 'package:book_reader/services/http/book_source_fetcher.dart';
 import 'package:book_reader/services/http/dio_book_source_fetcher.dart';
-import 'package:book_reader/services/preferences/reading_prefs_repository.dart';
 import 'package:book_reader/services/preferences/reading_progress_repository.dart';
+import 'package:book_reader/services/preferences/reading_prefs_repository.dart';
+import 'package:book_reader/services/tts/tts_service.dart';
 import 'package:book_reader/services/rule_engine/rule_engine.dart';
 import 'package:book_reader/services/search/search_aggregator.dart';
 import 'package:book_reader/services/search/single_source_searcher.dart';
@@ -53,6 +57,24 @@ final searchHistoryBoxProvider = Provider<Box<String>>((ref) {
       'searchHistoryBoxProvider 必须在 main.dart 中 override');
 });
 
+/// 笔记 Box。
+final notesBoxProvider = Provider<Box<String>>((ref) {
+  throw UnimplementedError(
+      'notesBoxProvider 必须在 main.dart 中 override');
+});
+
+/// 书签 Box。
+final bookmarksBoxProvider = Provider<Box<String>>((ref) {
+  throw UnimplementedError(
+      'bookmarksBoxProvider 必须在 main.dart 中 override');
+});
+
+/// 阅读统计 Box。
+final readingStatsBoxProvider = Provider<Box<String>>((ref) {
+  throw UnimplementedError(
+      'readingStatsBoxProvider 必须在 main.dart 中 override');
+});
+
 final bookSourceRepositoryProvider = Provider<BookSourceRepository>((ref) {
   final box = ref.watch(bookSourceBoxProvider);
   return HiveBookSourceRepository(box);
@@ -83,6 +105,23 @@ final searchHistoryRepositoryProvider =
 
 final hotKeywordsRepositoryProvider = Provider<HotKeywordsRepository>((ref) {
   return HotKeywordsRepository(ref.watch(searchHistoryRepositoryProvider));
+});
+
+final noteRepositoryProvider = Provider<NoteRepository>((ref) {
+  return NoteRepository(ref.watch(notesBoxProvider));
+});
+
+final bookmarkRepositoryProvider = Provider<BookmarkRepository>((ref) {
+  return BookmarkRepository(ref.watch(bookmarksBoxProvider));
+});
+
+final readingStatsRepositoryProvider = Provider<ReadingStatsRepository>((ref) {
+  return ReadingStatsRepository(ref.watch(readingStatsBoxProvider));
+});
+
+/// TTS 服务（默认 NoOp，移动端可 override 为 flutter_tts 实现）。
+final ttsServiceProvider = Provider<TtsService>((ref) {
+  return NoOpTtsService();
 });
 
 /// 全局阅读偏好（响应式）：所有页面共享同一份偏好。
