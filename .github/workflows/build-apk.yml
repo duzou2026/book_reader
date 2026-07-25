@@ -48,6 +48,30 @@ jobs:
         run: flutter test
         continue-on-error: true
 
+      # 配置 release 签名：从 GitHub Secret 解码 keystore 并生成 key.properties
+      # 没有配置 secret 时跳过此步，构建会回退到 debug 签名（本地开发场景）
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+        # KEYSTORE_BASE64 非空才执行（用 shell 判断，比 if 表达式更可靠）
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "⚠ KEYSTORE_BASE64 未配置，将使用 debug 签名（无法覆盖安装正式版）"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          {
+            echo "storeFile=app/release.keystore"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+          echo "✓ release.keystore 已生成"
+          ls -la android/app/release.keystore
+
       - name: Build release APK (split per ABI)
         run: flutter build apk --release --split-per-abi
 
