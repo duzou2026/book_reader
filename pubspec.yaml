@@ -19,6 +19,7 @@ dependencies:
   dio: ^5.4.0
   html: ^0.15.4
   flutter_js: ^0.8.0
+  gbk_codec: ^0.4.0
   freezed_annotation: ^2.4.0
   json_annotation: ^4.8.0
   path_provider: ^2.1.0

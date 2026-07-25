@@ -1,3 +1,5 @@
+import 'package:html/dom.dart';
+
 import 'css_selector_parser.dart';
 import 'js_executor.dart';
 import 'jsonpath_parser.dart';
@@ -77,6 +79,42 @@ class RuleEngine {
         return single == null ? [] : [single];
       case RuleType.plain:
         return [rule];
+      case RuleType.xpath:
+        throw UnimplementedError('xpath 暂未实现');
+    }
+  }
+
+  /// 对 bookList 规则求值，返回 Element 列表（仅 CSS 规则支持）。
+  ///
+  /// 用于「先取节点、再在每个节点上分别应用 name/author/bookUrl 规则」的场景。
+  /// 后续配合 [evalOnElement] 使用。
+  List<Element> evalElements(String html, String rule) {
+    if (rule.isEmpty) return [];
+    switch (_parser.detect(rule)) {
+      case RuleType.css:
+        return _css.queryElements(html, rule);
+      default:
+        throw UnimplementedError('evalElements 仅支持 CSS 规则');
+    }
+  }
+
+  /// 在已选定的 Element 上应用规则。
+  ///
+  /// 用于：先用 [evalElements] 拿到 bookList 节点列表，
+  /// 再对每个节点用本方法提取 name/author/coverUrl 等字段。
+  String? evalOnElement(Element element, String rule) {
+    if (rule.isEmpty) return null;
+    switch (_parser.detect(rule)) {
+      case RuleType.css:
+        return _css.extract(element, rule);
+      case RuleType.plain:
+        return rule;
+      // 其他类型（json/regex/js）对单个 Element 没有标准语义，
+      // 退化为：把 element.outerHtml 作为字符串输入再走原 eval
+      case RuleType.json:
+      case RuleType.regex:
+      case RuleType.js:
+        return eval(element.outerHtml, rule);
       case RuleType.xpath:
         throw UnimplementedError('xpath 暂未实现');
     }
