@@ -27,6 +27,7 @@ import 'package:book_reader/services/preferences/reading_prefs_repository.dart';
 import 'package:book_reader/services/tts/tts_service.dart';
 import 'package:book_reader/services/rule_engine/rule_engine.dart';
 import 'package:book_reader/services/search/search_aggregator.dart';
+import 'package:book_reader/services/search/search_result_cache.dart';
 import 'package:book_reader/services/search/single_source_searcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
@@ -162,6 +163,11 @@ final singleSourceSearcherProvider = Provider<SingleSourceSearcher>((ref) {
 
 final searchAggregatorProvider = Provider<SearchAggregator>((ref) {
   return SearchAggregator(searcher: ref.watch(singleSourceSearcherProvider));
+});
+
+/// 搜索结果缓存（内存，跨页面共享）。
+final searchResultCacheProvider = Provider<SearchResultCache>((ref) {
+  return SearchResultCache();
 });
 
 final searchBooksProvider = Provider<SearchBooks>((ref) {

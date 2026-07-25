@@ -2,6 +2,7 @@ import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/data/search_history_repository.dart';
 import 'package:book_reader/services/search/search_aggregator.dart';
+import 'package:book_reader/services/search/search_result_cache.dart';
 import 'package:book_reader/ui/search/search_result_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +17,13 @@ class SearchPage extends ConsumerStatefulWidget {
 
 class _SearchPageState extends ConsumerState<SearchPage> {
   final _controller = TextEditingController();
-  List<SearchResult> _results = const [];
+
+  /// 原始搜索结果（未排序/筛选）。
+  List<SearchResult> _rawResults = const [];
+
+  /// 当前生效的关键词。
+  String _lastKeyword = '';
+
   bool _loading = false;
   String? _error;
 
@@ -26,11 +33,23 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   /// 是否已展示过结果（区分「初始空态」和「搜索后无结果」）。
   bool _hasSearched = false;
 
+  /// 当前结果是否来自缓存。
+  bool _fromCache = false;
+
   /// 搜索历史。
   List<SearchHistoryEntry> _history = const [];
 
   /// 热门词。
   List<String> _hot = const [];
+
+  /// 排序方式。
+  SearchResultSort _sort = SearchResultSort.sourceCount;
+
+  /// 当前书源筛选（null = 全部）。
+  String? _filterSourceUrl;
+
+  /// 当前分类筛选（null = 全部）。
+  String? _filterKind;
 
   @override
   void initState() {
@@ -56,7 +75,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     });
   }
 
-  Future<void> _search({String? keyword}) async {
+  Future<void> _search({String? keyword, bool forceRefresh = false}) async {
     final kw = (keyword ?? _controller.text).trim();
     if (kw.isEmpty) return;
     _controller.text = kw;
@@ -67,7 +86,27 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       _error = null;
       _progress = null;
       _hasSearched = true;
+      _lastKeyword = kw;
+      _filterSourceUrl = null;
+      _filterKind = null;
     });
+    // 缓存命中（非强制刷新时）
+    if (!forceRefresh) {
+      final cached = ref.read(searchResultCacheProvider).get(kw);
+      if (cached != null) {
+        if (!mounted) return;
+        setState(() {
+          _rawResults = cached;
+          _fromCache = true;
+          _loading = false;
+        });
+        // 仍记录搜索历史
+        await ref.read(searchHistoryRepositoryProvider).record(kw);
+        await _loadSuggestions();
+        return;
+      }
+    }
+    setState(() => _fromCache = false);
     try {
       final useCase = ref.read(searchBooksProvider);
       final results = await useCase(kw, onProgress: (p) {
@@ -75,7 +114,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
         setState(() => _progress = p);
       });
       if (!mounted) return;
-      setState(() => _results = results);
+      // 写入缓存
+      ref.read(searchResultCacheProvider).put(kw, results);
+      setState(() {
+        _rawResults = results;
+      });
       // 记录搜索历史
       await ref.read(searchHistoryRepositoryProvider).record(kw);
       await _loadSuggestions();
@@ -87,6 +130,49 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     }
   }
 
+  /// 当前过滤+排序后的结果。
+  List<SearchResult> get _results {
+    var list = _rawResults;
+    if (_filterSourceUrl != null) {
+      list = list
+          .where((r) => r.sources.any((s) => s.sourceUrl == _filterSourceUrl))
+          .toList();
+    }
+    if (_filterKind != null) {
+      list = list.where((r) => _normalizeKind(r.kind) == _filterKind).toList();
+    }
+    return sortSearchResults(list, _sort);
+  }
+
+  /// 提取所有出现过的书源（用于筛选条）。
+  List<SearchSource> get _availableSources {
+    final map = <String, SearchSource>{};
+    for (final r in _rawResults) {
+      for (final s in r.sources) {
+        map.putIfAbsent(s.sourceUrl, () => s);
+      }
+    }
+    return map.values.toList()
+      ..sort((a, b) => a.sourceName.compareTo(b.sourceName));
+  }
+
+  /// 提取所有出现过的分类。
+  List<String> get _availableKinds {
+    final set = <String>{};
+    for (final r in _rawResults) {
+      final k = _normalizeKind(r.kind);
+      if (k != null) set.add(k);
+    }
+    return set.toList()..sort();
+  }
+
+  String? _normalizeKind(String? kind) {
+    if (kind == null || kind.trim().isEmpty) return null;
+    // 取第一个分类词（按 ,，、 空白分割）
+    final first = kind.split(RegExp(r'[,，、\s]+')).first;
+    return first.trim().isEmpty ? null : first.trim();
+  }
+
   Future<void> _clearHistory() async {
     await ref.read(searchHistoryRepositoryProvider).clear();
     await _loadSuggestions();
@@ -94,6 +180,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    final results = _results;
     return Scaffold(
       appBar: AppBar(
         title: const Text('搜书'),
@@ -126,30 +213,228 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       )
-                    : IconButton(
-                        icon: const Icon(Icons.send),
-                        onPressed: _loading ? null : () => _search(),
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_fromCache)
+                            IconButton(
+                              tooltip: '缓存中，点击强制刷新',
+                              icon: const Icon(Icons.cached, size: 20),
+                              onPressed: () =>
+                                  _search(keyword: _lastKeyword, forceRefresh: true),
+                            ),
+                          IconButton(
+                            icon: const Icon(Icons.send),
+                            onPressed: _loading
+                                ? null
+                                : () => _search(),
+                          ),
+                        ],
                       ),
               ),
             ),
           ),
+          // 缓存徽章
+          if (_fromCache && !_loading)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: GestureDetector(
+                  onTap: () => _search(keyword: _lastKeyword, forceRefresh: true),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      '来自缓存 · 点击刷新',
+                      style: TextStyle(fontSize: 11, color: Colors.orange),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           // 搜索进度条
           if (_loading && _progress != null) _buildProgressBar(),
           if (_error != null) _buildErrorBanner(),
+          // 排序 + 筛选条
+          if (_rawResults.length > 1 && !_loading) _buildFilterBar(results.length),
           Expanded(
-            child: _results.isEmpty && !_loading
+            child: _rawResults.isEmpty && !_loading
                 ? _hasSearched
                     ? _buildNoResultGuide()
                     : _buildSuggestions()
-                : ListView.builder(
-                    itemCount: _results.length,
-                    itemBuilder: (context, i) =>
-                        SearchResultTile(result: _results[i]),
-                  ),
+                : results.isEmpty
+                    ? Center(
+                        child: Text('当前筛选下无结果',
+                            style: TextStyle(color: Colors.grey.shade500)),
+                      )
+                    : ListView.builder(
+                        itemCount: results.length,
+                        itemBuilder: (context, i) =>
+                            SearchResultTile(result: results[i]),
+                      ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildFilterBar(int shownCount) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          // 排序下拉
+          PopupMenuButton<SearchResultSort>(
+            tooltip: '排序',
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.sort, size: 14),
+                  const SizedBox(width: 4),
+                  Text(_sortLabel(_sort), style: const TextStyle(fontSize: 12)),
+                  const Icon(Icons.arrow_drop_down, size: 14),
+                ],
+              ),
+            ),
+            onSelected: (v) => setState(() => _sort = v),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: SearchResultSort.sourceCount,
+                child: Text('按源数（多源优先）'),
+              ),
+              PopupMenuItem(
+                value: SearchResultSort.wordCount,
+                child: Text('按字数（长篇优先）'),
+              ),
+              PopupMenuItem(
+                value: SearchResultSort.title,
+                child: Text('按书名'),
+              ),
+            ],
+          ),
+          // 书源筛选
+          if (_availableSources.length > 1)
+            PopupMenuButton<String?>(
+              tooltip: '筛选书源',
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _filterSourceUrl != null
+                      ? Colors.teal.withOpacity(0.12)
+                      : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.filter_alt_outlined, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      _filterSourceUrl == null
+                          ? '全部源'
+                          : _availableSources
+                              .firstWhere((s) =>
+                                  s.sourceUrl == _filterSourceUrl)
+                              .sourceName,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const Icon(Icons.arrow_drop_down, size: 14),
+                  ],
+                ),
+              ),
+              onSelected: (v) => setState(() => _filterSourceUrl = v),
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: null, child: Text('全部源')),
+                ..._availableSources.map((s) => PopupMenuItem(
+                      value: s.sourceUrl,
+                      child: Text(s.sourceName),
+                    )),
+              ],
+            ),
+          // 分类筛选
+          if (_availableKinds.isNotEmpty)
+            PopupMenuButton<String?>(
+              tooltip: '筛选分类',
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _filterKind != null
+                      ? Colors.teal.withOpacity(0.12)
+                      : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.label_outline, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      _filterKind ?? '全分类',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const Icon(Icons.arrow_drop_down, size: 14),
+                  ],
+                ),
+              ),
+              onSelected: (v) => setState(() => _filterKind = v),
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: null, child: Text('全分类')),
+                ..._availableKinds.map((k) => PopupMenuItem(
+                      value: k,
+                      child: Text(k),
+                    )),
+              ],
+            ),
+          // 计数
+          Text(
+            '$shownCount / ${_rawResults.length} 条',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+          ),
+          if (_filterSourceUrl != null || _filterKind != null)
+            TextButton(
+              onPressed: () => setState(() {
+                _filterSourceUrl = null;
+                _filterKind = null;
+              }),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 28),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('清除筛选', style: TextStyle(fontSize: 12)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _sortLabel(SearchResultSort s) {
+    switch (s) {
+      case SearchResultSort.sourceCount:
+        return '源数';
+      case SearchResultSort.wordCount:
+        return '字数';
+      case SearchResultSort.title:
+        return '书名';
+    }
   }
 
   /// 搜索进度条：显示「3/6 源已返回 · 已找到 12 条」。
