@@ -4,6 +4,7 @@ import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/app/router.dart';
 import 'package:book_reader/data/demo_book_sources.dart';
 import 'package:book_reader/services/preferences/theme_prefs_repository.dart';
+import 'package:book_reader/ui/settings/app_update_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
@@ -59,14 +60,34 @@ Future<void> _seedDemoBookSources(Box<String> box) async {
   }
 }
 
-class BookReaderApp extends ConsumerWidget {
+class BookReaderApp extends ConsumerStatefulWidget {
   const BookReaderApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BookReaderApp> createState() => _BookReaderAppState();
+}
+
+class _BookReaderAppState extends ConsumerState<BookReaderApp> {
+  final _appKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    // 启动后异步静默检查更新（不阻塞首屏渲染）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _appKey.currentContext;
+      if (ctx != null) {
+        AppUpdateController.checkOnStartup(ctx, ref);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final prefs = ref.watch(themePrefsProvider);
     final seed = Color(prefs.seedColor);
     return MaterialApp.router(
+      key: _appKey,
       title: 'Book Reader',
       theme: ThemeData(
         useMaterial3: true,

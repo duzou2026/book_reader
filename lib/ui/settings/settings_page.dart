@@ -1,5 +1,7 @@
 import 'package:book_reader/app/providers.dart';
+import 'package:book_reader/services/app_update/app_update_providers.dart';
 import 'package:book_reader/services/preferences/theme_prefs_repository.dart';
+import 'package:book_reader/ui/settings/app_update_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -50,11 +52,20 @@ class SettingsPage extends ConsumerWidget {
             onTap: () {},
           ),
           const Divider(),
+          _SectionHeader(title: '更新'),
+          ListTile(
+            leading: const Icon(Icons.system_update),
+            title: const Text('检查更新'),
+            subtitle: const Text('从 GitHub Release 拉取最新版本'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => AppUpdateController.checkManually(context, ref),
+          ),
+          const Divider(),
           _SectionHeader(title: '关于'),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('应用版本'),
-            subtitle: Text('0.1.0'),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('应用版本'),
+            subtitle: Text(kCurrentAppVersion),
           ),
           ListTile(
             leading: const Icon(Icons.code),

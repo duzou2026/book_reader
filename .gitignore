@@ -23,6 +23,8 @@ build/
 **/*.freezed.dart
 !lib/data/models/*.g.dart
 !lib/data/models/*.freezed.dart
+!lib/services/app_update/*.g.dart
+!lib/services/app_update/*.freezed.dart
 
 # Misc
 *.log
