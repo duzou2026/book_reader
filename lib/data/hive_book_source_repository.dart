@@ -31,9 +31,18 @@ class HiveBookSourceRepository implements BookSourceRepository {
   }
 
   /// 返回全部书源（含禁用），供管理页使用。
+  @override
   Future<List<BookSource>> getAll() async {
     return _box.values
         .map((s) => BookSource.fromJson(jsonDecode(s) as Map<String, dynamic>))
         .toList();
+  }
+
+  @override
+  Future<void> setEnabled(String bookSourceUrl, bool enabled) async {
+    final raw = _box.get(bookSourceUrl);
+    if (raw == null) return;
+    final source = BookSource.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    await _box.put(bookSourceUrl, jsonEncode(source.copyWith(enabled: enabled).toJson()));
   }
 }

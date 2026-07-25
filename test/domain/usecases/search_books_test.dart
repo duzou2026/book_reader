@@ -30,6 +30,12 @@ class _FakeRepository implements BookSourceRepository {
 
   @override
   Future<void> deleteByUrl(String bookSourceUrl) async {}
+
+  @override
+  Future<List<BookSource>> getAll() async => sources;
+
+  @override
+  Future<void> setEnabled(String bookSourceUrl, bool enabled) async {}
 }
 
 void main() {

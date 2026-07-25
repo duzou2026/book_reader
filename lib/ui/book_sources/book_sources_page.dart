@@ -1,5 +1,4 @@
 import 'package:book_reader/app/providers.dart';
-import 'package:book_reader/data/hive_book_source_repository.dart';
 import 'package:book_reader/data/models/book_source.dart';
 import 'package:book_reader/ui/book_sources/book_source_import_dialog.dart';
 import 'package:flutter/material.dart';
@@ -23,10 +22,7 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
   }
 
   void _reload() {
-    final repo = ref.read(bookSourceRepositoryProvider);
-    _future = repo is HiveBookSourceRepository
-        ? repo.getAll()
-        : repo.getEnabledSources();
+    _future = ref.read(bookSourceRepositoryProvider).getAll();
   }
 
   Future<void> _openImport() async {
@@ -40,6 +36,13 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
         SnackBar(content: Text('已导入 $count 个书源')),
       );
     }
+  }
+
+  Future<void> _toggle(BookSource source, bool value) async {
+    await ref
+        .read(bookSourceRepositoryProvider)
+        .setEnabled(source.bookSourceUrl, value);
+    setState(_reload);
   }
 
   Future<void> _delete(BookSource source) async {
@@ -92,30 +95,51 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
               ),
             );
           }
-          return ListView.separated(
-            itemCount: list.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, i) {
-              final s = list[i];
-              return ListTile(
-                title: Text(s.bookSourceName),
-                subtitle: Text(s.bookSourceUrl),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+          final enabledCount = list.where((s) => s.enabled).length;
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
                   children: [
-                    Icon(
-                      s.enabled ? Icons.check_circle : Icons.circle_outlined,
-                      color: s.enabled ? Colors.green : Colors.grey,
-                      size: 20,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _delete(s),
-                    ),
+                    Text('共 ${list.length} 个源',
+                        style: TextStyle(
+                            color: Colors.grey.shade700, fontSize: 13)),
+                    const SizedBox(width: 8),
+                    Text('· 已启用 $enabledCount',
+                        style: TextStyle(
+                            color: Colors.green.shade700, fontSize: 13)),
                   ],
                 ),
-              );
-            },
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: list.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, i) {
+                    final s = list[i];
+                    return ListTile(
+                      title: Text(s.bookSourceName),
+                      subtitle: Text(s.bookSourceUrl),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Switch(
+                            value: s.enabled,
+                            onChanged: (v) => _toggle(s, v),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => _delete(s),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),

@@ -9,11 +9,20 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final dir = await getApplicationDocumentsDirectory();
   Hive.init(dir.path);
-  final box = await Hive.openBox<String>('book_sources');
+  final bookSourceBox = await Hive.openBox<String>('book_sources');
+  final bookshelfBox =
+      await Hive.openBox<String>('bookshelf');
+  final readingProgressBox =
+      await Hive.openBox<String>('reading_progress');
+  final readingPrefsBox =
+      await Hive.openBox<String>('reading_prefs');
   runApp(
     ProviderScope(
       overrides: [
-        bookSourceBoxProvider.overrideWithValue(box),
+        bookSourceBoxProvider.overrideWithValue(bookSourceBox),
+        bookshelfBoxProvider.overrideWithValue(bookshelfBox),
+        readingProgressBoxProvider.overrideWithValue(readingProgressBox),
+        readingPrefsBoxProvider.overrideWithValue(readingPrefsBox),
       ],
       child: const BookReaderApp(),
     ),

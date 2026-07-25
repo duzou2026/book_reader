@@ -1,4 +1,5 @@
 import 'package:book_reader/app/providers.dart';
+import 'package:book_reader/data/bookshelf_repository.dart';
 import 'package:book_reader/data/models/book_info.dart';
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/ui/audio/audio_player_page.dart';
@@ -23,10 +24,73 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   bool _loadingAudio = false;
   String? _error;
 
+  /// 是否已在书架中。
+  bool _inBookshelf = false;
+
+  /// 当前书架记录（若存在）。
+  BookshelfEntry? _entry;
+
+  String get _id => BookshelfEntry.makeId(
+      widget.searchResult.bookName, widget.searchResult.author);
+
   @override
   void initState() {
     super.initState();
     _loadInfo();
+    _loadBookshelfStatus();
+  }
+
+  Future<void> _loadBookshelfStatus() async {
+    final repo = ref.read(bookshelfRepositoryProvider);
+    final entry = await repo.getById(_id);
+    if (!mounted) return;
+    setState(() {
+      _entry = entry;
+      _inBookshelf = entry != null;
+    });
+  }
+
+  Future<void> _toggleBookshelf() async {
+    final repo = ref.read(bookshelfRepositoryProvider);
+    if (_inBookshelf) {
+      await repo.delete(_id);
+      if (!mounted) return;
+      setState(() {
+        _inBookshelf = false;
+        _entry = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已移出书架')),
+      );
+    } else {
+      final sr = widget.searchResult;
+      final info = _info;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final entry = BookshelfEntry(
+        id: _id,
+        bookName: info?.name ?? sr.bookName,
+        author: info?.author ?? sr.author,
+        coverUrl: info?.coverUrl ?? sr.coverUrl,
+        intro: info?.intro ?? sr.intro,
+        kind: info?.kind ?? sr.kind,
+        wordCount: info?.wordCount ?? sr.wordCount,
+        lastChapter: info?.lastChapter ?? sr.lastChapter,
+        sourceName: info?.sourceName ?? sr.sources.first.sourceName,
+        sourceUrl: info?.sourceUrl ?? sr.sources.first.sourceUrl,
+        bookUrl: info?.url ?? sr.sources.first.bookUrl,
+        lastReadAt: now,
+        addedAt: now,
+      );
+      await repo.upsert(entry);
+      if (!mounted) return;
+      setState(() {
+        _inBookshelf = true;
+        _entry = entry;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已加入书架')),
+      );
+    }
   }
 
   Future<void> _loadInfo() async {
@@ -117,6 +181,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
+                // 顶部信息区 + 加入书架按钮
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
@@ -167,6 +232,25 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                                   style: TextStyle(
                                       color: Colors.grey.shade600, fontSize: 12)),
                             ],
+                            const SizedBox(height: 10),
+                            // 加入书架按钮
+                            OutlinedButton.icon(
+                              onPressed: _toggleBookshelf,
+                              icon: Icon(
+                                _inBookshelf
+                                    ? Icons.bookmark
+                                    : Icons.bookmark_border,
+                                size: 16,
+                              ),
+                              label: Text(_inBookshelf ? '已收藏' : '加入书架'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
+                                minimumSize: const Size(0, 32),
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -257,6 +341,61 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                             )),
                   ),
               ],
+            ),
+      bottomNavigationBar: _info == null || _chapters.isEmpty
+          ? null
+          : SafeArea(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  border: Border(
+                      top: BorderSide(color: Colors.grey.shade300, width: 0.5)),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: '加入书架',
+                      onPressed: _toggleBookshelf,
+                      icon: Icon(
+                        _inBookshelf
+                            ? Icons.bookmark
+                            : Icons.bookmark_border,
+                        color: _inBookshelf
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          final info2 = _info!;
+                          // 若有续读进度，从上次章节开始；否则从第一章开始
+                          final start = (_entry?.lastChapterIndex ?? 0)
+                              .clamp(0, _chapters.length - 1);
+                          context.go('/reader',
+                              extra: ReaderArgs(
+                                book: info2,
+                                chapters: _chapters,
+                                initialIndex: start,
+                                alternatives: _buildAlternatives(),
+                              ));
+                        },
+                        icon: const Icon(Icons.menu_book),
+                        label: Text(
+                          _entry?.lastChapterIndex != null
+                              ? '继续阅读 · ${_entry?.lastChapterName ?? ''}'
+                              : '开始阅读',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
     );
   }

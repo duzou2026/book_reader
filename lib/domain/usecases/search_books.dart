@@ -10,6 +10,12 @@ abstract class BookSourceRepository {
   Future<List<BookSource>> getEnabledSources();
   Future<void> upsert(BookSource source);
   Future<void> deleteByUrl(String bookSourceUrl);
+
+  /// 返回全部书源（含禁用），供管理页使用。
+  Future<List<BookSource>> getAll();
+
+  /// 仅切换 [enabled] 字段（不影响其他字段）。
+  Future<void> setEnabled(String bookSourceUrl, bool enabled);
 }
 
 /// 搜索用例：domain 层入口。

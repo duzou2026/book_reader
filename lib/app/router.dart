@@ -1,6 +1,7 @@
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/ui/audio/audio_player_page.dart';
 import 'package:book_reader/ui/book/book_detail_page.dart';
+import 'package:book_reader/ui/book/bookshelf_page.dart';
 import 'package:book_reader/ui/book/reader_page.dart';
 import 'package:book_reader/ui/book_sources/book_sources_page.dart';
 import 'package:book_reader/ui/search/search_page.dart';
@@ -9,8 +10,12 @@ import 'package:go_router/go_router.dart';
 
 /// 全局路由配置。
 final appRouter = GoRouter(
-  initialLocation: '/search',
+  initialLocation: '/shelf',
   routes: [
+    GoRoute(
+      path: '/shelf',
+      builder: (context, state) => const BookshelfPage(),
+    ),
     GoRoute(
       path: '/search',
       builder: (context, state) => const SearchPage(),

@@ -1,7 +1,9 @@
 import 'package:book_reader/app/providers.dart';
+import 'package:book_reader/data/bookshelf_repository.dart';
 import 'package:book_reader/data/models/book_info.dart';
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/domain/usecases/resolve_chapter_content.dart';
+import 'package:book_reader/services/preferences/reading_prefs_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -52,14 +54,23 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
   /// 标记本次切换提示是否已被用户处理（避免重复弹窗）。
   bool _switchPromptedForCurrent = false;
 
-  double _fontSize = 18;
-  static const _backgrounds = [
-    _Bg(Colors.white, Colors.black87),
-    _Bg(Color(0xFFF5F1E8), Colors.black87), // 护眼米黄
-    _Bg(Color(0xFF1F1F1F), Colors.white70), // 夜间
+  /// 滚动控制器（用于恢复阅读位置）。
+  final _scrollController = ScrollController();
+
+  /// 阅读时长（秒）。
+  int _readingSeconds = 0;
+
+  /// 阅读计时器。
+  // ignore: unused_field
+  // 这里通过 initState 启动 Timer，dispose 时取消。
+  // ignore: close_sinks
+  // _scrollController 在 dispose 中释放。
+
+  static const _backgrounds = <_Bg>[
+    _Bg('白', Colors.white, Colors.black87),
+    _Bg('米黄', Color(0xFFF5F1E8), Colors.black87),
+    _Bg('夜间', Color(0xFF1F1F1F), Colors.white70),
   ];
-  int _bgIndex = 0;
-  bool _settingsOpen = false;
 
   @override
   void initState() {
@@ -67,7 +78,47 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
     _currentIndex = widget.args.initialIndex;
     _currentBook = widget.args.book;
     _currentChapters = widget.args.chapters;
+    _restoreProgress();
     _load();
+    _startReadingTimer();
+  }
+
+  String get _id =>
+      BookshelfEntry.makeId(_currentBook.name ?? '', _currentBook.author ?? '');
+
+  void _startReadingTimer() {
+    Future.delayed(const Duration(seconds: 1), () {
+      if (!mounted) return;
+      setState(() => _readingSeconds++);
+      _startReadingTimer();
+    });
+  }
+
+  /// 恢复持久化的阅读位置（如果有）。
+  Future<void> _restoreProgress() async {
+    final progress =
+        await ref.read(readingProgressRepositoryProvider).get(_id);
+    if (progress == null || !mounted) return;
+    if (progress.chapterIndex < _currentChapters.length) {
+      _currentIndex = progress.chapterIndex;
+    }
+  }
+
+  /// 持久化当前进度。
+  Future<void> _persistProgress() async {
+    final chapter = _currentChapter;
+    await ref.read(readingProgressRepositoryProvider).updateChapter(
+          id: _id,
+          chapterIndex: _currentIndex,
+          switchedSourceUrl: _currentBook.sourceUrl,
+        );
+    await ref
+        .read(bookshelfRepositoryProvider)
+        .updateReadingProgress(
+          id: _id,
+          chapterIndex: _currentIndex,
+          chapterName: chapter.name,
+        );
   }
 
   Chapter get _currentChapter => _currentChapters[_currentIndex];
@@ -91,6 +142,12 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
         _content = resolved.content;
         _loading = false;
       });
+      // 滚到顶部
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
+      // 持久化进度
+      _persistProgress();
       // 若跨源成功且尚未切换过 → 弹窗询问
       if (resolved.switchedTo != null && !_switchPromptedForCurrent) {
         _switchPromptedForCurrent = true;
@@ -117,9 +174,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
       if (_currentBook.sourceUrl != widget.args.book.sourceUrl)
         widget.args.book,
     ];
-    return list
-        .where((b) => b.sourceUrl != currentUrl)
-        .toList();
+    return list.where((b) => b.sourceUrl != currentUrl).toList();
   }
 
   Future<void> _goChapter(int index) async {
@@ -129,7 +184,6 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
   }
 
   void _showSwitchDialog(ResolvedContent resolved) {
-    final bg = _backgrounds[_bgIndex];
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -152,8 +206,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('暂不切换',
-                  style: TextStyle(color: bg.foreground.withOpacity(0.6))),
+              child: const Text('暂不切换'),
             ),
             FilledButton.icon(
               icon: const Icon(Icons.check, size: 18),
@@ -227,9 +280,24 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
     }
   }
 
+  String _formatReadingTime(int seconds) {
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    if (m == 0) return '$s 秒';
+    return '$m 分 $s 秒';
+  }
+
+  @override
+  void dispose() {
+    _persistProgress();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bg = _backgrounds[_bgIndex];
+    final prefs = ref.watch(readingPrefsProvider);
+    final bg = _backgrounds[prefs.backgroundIndex.clamp(0, _backgrounds.length - 1)];
     final isOnSwitchedSource =
         _currentBook.sourceUrl != widget.args.book.sourceUrl;
     return Scaffold(
@@ -240,23 +308,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/book',
-              extra: SearchResult(
-                bookName: widget.args.book.name ?? '',
-                author: widget.args.book.author ?? '',
-                coverUrl: widget.args.book.coverUrl,
-                intro: widget.args.book.intro,
-                kind: widget.args.book.kind,
-                wordCount: widget.args.book.wordCount,
-                lastChapter: widget.args.book.lastChapter,
-                sources: [
-                  SearchSource(
-                    sourceName: widget.args.book.sourceName,
-                    sourceUrl: widget.args.book.sourceUrl,
-                    bookUrl: widget.args.book.url,
-                  ),
-                ],
-              )),
+          onPressed: () => _exit(),
         ),
         title: Text(_currentChapter.name,
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
@@ -278,191 +330,486 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
             onPressed: _loading ? null : _manualResolve,
           ),
           IconButton(
+            icon: const Icon(Icons.list),
+            tooltip: '目录',
+            onPressed: () => _openChapterDrawer(),
+          ),
+          IconButton(
             icon: const Icon(Icons.tune),
-            onPressed: () => setState(() => _settingsOpen = !_settingsOpen),
+            tooltip: '设置',
+            onPressed: () => _openSettingsSheet(),
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          if (_loading)
-            const Center(child: CircularProgressIndicator())
-          else if (_error != null)
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('加载失败：$_error',
-                      style: TextStyle(color: bg.foreground)),
-                  const SizedBox(height: 12),
-                  FilledButton(onPressed: _load, child: const Text('重试')),
-                ],
-              ),
-            )
-          else
-            GestureDetector(
-              onTap: () => setState(() => _settingsOpen = !_settingsOpen),
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Text(
-                    _currentChapter.name,
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: bg.foreground),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('加载失败：$_error',
+                          style: TextStyle(color: bg.foreground)),
+                      const SizedBox(height: 12),
+                      FilledButton(onPressed: _load, child: const Text('重试')),
+                    ],
                   ),
-                  if (_lastResolved?.isVip == true &&
-                      _lastResolved?.switchedTo == null) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                            color: Colors.orange.withOpacity(0.4), width: 1),
+                )
+              : GestureDetector(
+                  onTap: () {}, // 留空：所有操作通过 AppBar 完成
+                  child: ListView(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      Text(
+                        _currentChapter.name,
+                        style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: bg.foreground),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.lock, size: 16, color: Colors.orange),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              '本章为 VIP 章节，且未找到其他免费源',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: bg.foreground.withOpacity(0.8),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_currentIndex + 1} / ${_currentChapters.length} · 已读 ${_formatReadingTime(_readingSeconds)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: bg.foreground.withOpacity(0.5),
+                        ),
+                      ),
+                      if (_lastResolved?.isVip == true &&
+                          _lastResolved?.switchedTo == null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: Colors.orange.withOpacity(0.4),
+                                width: 1),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.lock,
+                                  size: 16, color: Colors.orange),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '本章为 VIP 章节，且未找到其他免费源',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: bg.foreground.withOpacity(0.8),
+                                  ),
+                                ),
                               ),
-                            ),
+                              TextButton.icon(
+                                icon: const Icon(Icons.refresh, size: 14),
+                                label: const Text('重试换源',
+                                    style: TextStyle(fontSize: 12)),
+                                onPressed: _manualResolve,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      SelectionArea(
+                        child: Text(
+                          _content?.isNotEmpty == true
+                              ? _content!
+                              : '（本章内容为空）',
+                          style: TextStyle(
+                              fontSize: prefs.fontSize,
+                              height: prefs.lineHeight,
+                              color: bg.foreground),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          TextButton.icon(
+                            onPressed: _currentIndex > 0
+                                ? () => _goChapter(_currentIndex - 1)
+                                : null,
+                            icon: const Icon(Icons.chevron_left),
+                            label: const Text('上一章'),
                           ),
                           TextButton.icon(
-                            icon: const Icon(Icons.refresh, size: 14),
-                            label: const Text('重试换源',
-                                style: TextStyle(fontSize: 12)),
-                            onPressed: _manualResolve,
+                            onPressed:
+                                _currentIndex < _currentChapters.length - 1
+                                    ? () => _goChapter(_currentIndex + 1)
+                                    : null,
+                            icon: const Icon(Icons.chevron_right),
+                            label: const Text('下一章'),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Text(
-                    _content?.isNotEmpty == true
-                        ? _content!
-                        : '（本章内容为空）',
-                    style: TextStyle(
-                        fontSize: _fontSize,
-                        height: 1.7,
-                        color: bg.foreground),
-                  ),
-                  const SizedBox(height: 32),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      TextButton.icon(
-                        onPressed: _currentIndex > 0
-                            ? () => _goChapter(_currentIndex - 1)
-                            : null,
-                        icon: const Icon(Icons.chevron_left),
-                        label: const Text('上一章'),
-                      ),
-                      TextButton.icon(
-                        onPressed: _currentIndex < _currentChapters.length - 1
-                            ? () => _goChapter(_currentIndex + 1)
-                            : null,
-                        icon: const Icon(Icons.chevron_right),
-                        label: const Text('下一章'),
-                      ),
                     ],
                   ),
-                ],
-              ),
+                ),
+    );
+  }
+
+  /// 退出阅读：返回到详情页。
+  void _exit() {
+    context.go('/book',
+        extra: SearchResult(
+          bookName: _currentBook.name ?? '',
+          author: _currentBook.author ?? '',
+          coverUrl: _currentBook.coverUrl,
+          intro: _currentBook.intro,
+          kind: _currentBook.kind,
+          wordCount: _currentBook.wordCount,
+          lastChapter: _currentBook.lastChapter,
+          sources: [
+            SearchSource(
+              sourceName: _currentBook.sourceName,
+              sourceUrl: _currentBook.sourceUrl,
+              bookUrl: _currentBook.url,
             ),
-          if (_settingsOpen) _buildSettingsPanel(bg),
-        ],
+          ],
+        ));
+  }
+
+  /// 章节抽屉。
+  void _openChapterDrawer() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      builder: (ctx) => _ChapterDrawer(
+        chapters: _currentChapters,
+        currentIndex: _currentIndex,
+        sourceName: _currentBook.sourceName,
+        onSelected: (i) {
+          Navigator.of(ctx).pop();
+          _goChapter(i);
+        },
       ),
     );
   }
 
-  Widget _buildSettingsPanel(_Bg bg) {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Material(
-        color: bg.color.withOpacity(0.97),
-        elevation: 8,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text('字号', style: TextStyle(color: bg.foreground, fontSize: 14)),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: () => setState(() {
-                      if (_fontSize > 12) _fontSize -= 1;
-                    }),
+  /// 设置面板（用 BottomSheet 替代原 Stack 覆盖层）。
+  void _openSettingsSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      builder: (ctx) => const _SettingsSheet(),
+    );
+  }
+}
+
+/// 章节抽屉：搜索 + 列表 + 跳转。
+class _ChapterDrawer extends StatefulWidget {
+  final List<Chapter> chapters;
+  final int currentIndex;
+  final String sourceName;
+  final ValueChanged<int> onSelected;
+
+  const _ChapterDrawer({
+    required this.chapters,
+    required this.currentIndex,
+    required this.sourceName,
+    required this.onSelected,
+  });
+
+  @override
+  State<_ChapterDrawer> createState() => _ChapterDrawerState();
+}
+
+class _ChapterDrawerState extends State<_ChapterDrawer> {
+  final _searchController = TextEditingController();
+  String _keyword = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final kw = _keyword.toLowerCase();
+    final filtered = kw.isEmpty
+        ? widget.chapters
+        : widget.chapters
+            .where((c) => c.name.toLowerCase().contains(kw))
+            .toList();
+    final height = MediaQuery.of(context).size.height * 0.7;
+    return SizedBox(
+      height: height,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                Text('目录 (${widget.chapters.length})',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  Text('${_fontSize.toInt()}',
-                      style: TextStyle(color: bg.foreground)),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () => setState(() {
-                      if (_fontSize < 32) _fontSize += 1;
-                    }),
+                  child: Text(
+                    widget.sourceName,
+                    style: const TextStyle(fontSize: 11),
                   ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => setState(() {
-                      _fontSize = 18;
-                      _bgIndex = 0;
-                    }),
-                    child: const Text('重置'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text('背景', style: TextStyle(color: bg.foreground, fontSize: 14)),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  for (var i = 0; i < _backgrounds.length; i++)
-                    GestureDetector(
-                      onTap: () => setState(() => _bgIndex = i),
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: _backgrounds[i].color,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: _bgIndex == i
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.grey,
-                            width: _bgIndex == i ? 3 : 1,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (v) => setState(() => _keyword = v.trim()),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: '搜索章节名',
+                prefixIcon: const Icon(Icons.search, size: 18),
+                border: const OutlineInputBorder(),
+                suffixIcon: _keyword.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _keyword = '');
+                        },
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: ListView.builder(
+              itemCount: filtered.length,
+              itemBuilder: (context, i) {
+                final c = filtered[i];
+                final originalIndex = widget.chapters.indexOf(c);
+                final isCurrent = originalIndex == widget.currentIndex;
+                return ListTile(
+                  dense: true,
+                  selected: isCurrent,
+                  selectedTileColor:
+                      Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                  leading: Text('${c.index}',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 12,
+                      )),
+                  title: Text(
+                    c.name,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: c.isVolume ? Colors.grey.shade500 : null,
+                      fontWeight: isCurrent
+                          ? FontWeight.bold
+                          : (c.isVolume
+                              ? FontWeight.bold
+                              : FontWeight.normal),
+                    ),
+                  ),
+                  trailing: c.isVip
+                      ? const Icon(Icons.lock,
+                          size: 14, color: Colors.orange)
+                      : (isCurrent
+                          ? Icon(Icons.play_arrow,
+                              size: 16,
+                              color:
+                                  Theme.of(context).colorScheme.primary)
+                          : null),
+                  enabled: !c.isVolume,
+                  onTap: c.isVolume
+                      ? null
+                      : () => widget.onSelected(originalIndex),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
+/// 设置面板（全局偏好，所有书共享）。
+class _SettingsSheet extends ConsumerWidget {
+  const _SettingsSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(readingPrefsProvider);
+    final notifier = ref.read(readingPrefsProvider.notifier);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.tune, size: 20),
+                SizedBox(width: 8),
+                Text('阅读设置',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const Divider(height: 24),
+            // 字号
+            Row(
+              children: [
+                const SizedBox(width: 72, child: Text('字号')),
+                Expanded(
+                  child: Slider(
+                    value: prefs.fontSize,
+                    min: 12,
+                    max: 32,
+                    divisions: 20,
+                    label: prefs.fontSize.toStringAsFixed(0),
+                    onChanged: notifier.setFontSize,
+                  ),
+                ),
+                SizedBox(
+                  width: 36,
+                  child: Text('${prefs.fontSize.toStringAsFixed(0)}',
+                      textAlign: TextAlign.right),
+                ),
+              ],
+            ),
+            // 行距
+            Row(
+              children: [
+                const SizedBox(width: 72, child: Text('行距')),
+                Expanded(
+                  child: Slider(
+                    value: prefs.lineHeight,
+                    min: 1.2,
+                    max: 2.4,
+                    divisions: 12,
+                    label: prefs.lineHeight.toStringAsFixed(1),
+                    onChanged: notifier.setLineHeight,
+                  ),
+                ),
+                SizedBox(
+                  width: 36,
+                  child: Text('${prefs.lineHeight.toStringAsFixed(1)}',
+                      textAlign: TextAlign.right),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text('背景', style: TextStyle(fontSize: 14)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                for (var i = 0; i < _ReaderPage_backgrounds_for_sheet.length; i++)
+                  GestureDetector(
+                    onTap: () => notifier.setBackgroundIndex(i),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      margin: const EdgeInsets.only(right: 10),
+                      decoration: BoxDecoration(
+                        color: _ReaderPage_backgrounds_for_sheet[i].color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: prefs.backgroundIndex == i
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.grey,
+                          width: prefs.backgroundIndex == i ? 3 : 1,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          _ReaderPage_backgrounds_for_sheet[i].label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _ReaderPage_backgrounds_for_sheet[i]
+                                .foreground
+                                .withOpacity(0.6),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // 翻页方式
+            const Text('翻页方式', style: TextStyle(fontSize: 14)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              children: PageMode.values.map((m) {
+                final selected = prefs.pageMode == m;
+                return ChoiceChip(
+                  label: Text(_pageModeLabel(m)),
+                  selected: selected,
+                  onSelected: (_) => notifier.setPageMode(m),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            // 跟随系统夜间模式
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('跟随系统夜间模式'),
+              subtitle: const Text('开启后夜间自动切换深色背景',
+                  style: TextStyle(fontSize: 12)),
+              value: prefs.followSystemDark,
+              onChanged: notifier.setFollowSystemDark,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _pageModeLabel(PageMode m) {
+    switch (m) {
+      case PageMode.scroll:
+        return '滚动';
+      case PageMode.horizontal:
+        return '左右翻页';
+      case PageMode.simulation:
+        return '仿真翻页';
+    }
+  }
+}
+
+// 顶部共享的背景列表（避免 ConsumerWidget 中跨文件引用私有 _Bg）。
+const _ReaderPage_backgrounds_for_sheet = <_Bg>[
+  _Bg('白', Colors.white, Colors.black87),
+  _Bg('米黄', Color(0xFFF5F1E8), Colors.black87),
+  _Bg('夜间', Color(0xFF1F1F1F), Colors.white70),
+];
+
 class _Bg {
+  final String label;
   final Color color;
   final Color foreground;
-  const _Bg(this.color, this.foreground);
+  const _Bg(this.label, this.color, this.foreground);
 }

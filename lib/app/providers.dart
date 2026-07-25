@@ -1,3 +1,4 @@
+import 'package:book_reader/data/bookshelf_repository.dart';
 import 'package:book_reader/data/hive_book_source_repository.dart';
 import 'package:book_reader/domain/usecases/get_audio.dart';
 import 'package:book_reader/domain/usecases/get_book_info.dart';
@@ -13,6 +14,8 @@ import 'package:book_reader/services/book_info/cross_source_content_resolver.dar
 import 'package:book_reader/services/book_info/toc_fetcher.dart';
 import 'package:book_reader/services/http/book_source_fetcher.dart';
 import 'package:book_reader/services/http/dio_book_source_fetcher.dart';
+import 'package:book_reader/services/preferences/reading_prefs_repository.dart';
+import 'package:book_reader/services/preferences/reading_progress_repository.dart';
 import 'package:book_reader/services/rule_engine/rule_engine.dart';
 import 'package:book_reader/services/search/search_aggregator.dart';
 import 'package:book_reader/services/search/single_source_searcher.dart';
@@ -25,9 +28,50 @@ final bookSourceBoxProvider = Provider<Box<String>>((ref) {
   throw UnimplementedError('bookSourceBoxProvider 必须在 main.dart 中 override');
 });
 
+/// 书架 Box。
+final bookshelfBoxProvider = Provider<Box<String>>((ref) {
+  throw UnimplementedError('bookshelfBoxProvider 必须在 main.dart 中 override');
+});
+
+/// 阅读进度 Box。
+final readingProgressBoxProvider = Provider<Box<String>>((ref) {
+  throw UnimplementedError(
+      'readingProgressBoxProvider 必须在 main.dart 中 override');
+});
+
+/// 阅读偏好 Box（全局字号/行距/背景等）。
+final readingPrefsBoxProvider = Provider<Box<String>>((ref) {
+  throw UnimplementedError(
+      'readingPrefsBoxProvider 必须在 main.dart 中 override');
+});
+
 final bookSourceRepositoryProvider = Provider<BookSourceRepository>((ref) {
   final box = ref.watch(bookSourceBoxProvider);
   return HiveBookSourceRepository(box);
+});
+
+final bookshelfRepositoryProvider = Provider<BookshelfRepository>((ref) {
+  final box = ref.watch(bookshelfBoxProvider);
+  return BookshelfRepository(box);
+});
+
+final readingProgressRepositoryProvider =
+    Provider<ReadingProgressRepository>((ref) {
+  final box = ref.watch(readingProgressBoxProvider);
+  return ReadingProgressRepository(box);
+});
+
+final readingPrefsRepositoryProvider =
+    Provider<ReadingPrefsRepository>((ref) {
+  final box = ref.watch(readingPrefsBoxProvider);
+  return ReadingPrefsRepository(box);
+});
+
+/// 全局阅读偏好（响应式）：所有页面共享同一份偏好。
+final readingPrefsProvider =
+    StateNotifierProvider<ReadingPrefsNotifier, ReadingPrefs>((ref) {
+  final repo = ref.watch(readingPrefsRepositoryProvider);
+  return ReadingPrefsNotifier(repo);
 });
 
 final fetcherProvider = Provider<BookSourceFetcher>((ref) {
