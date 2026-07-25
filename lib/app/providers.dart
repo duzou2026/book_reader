@@ -10,6 +10,7 @@ import 'package:book_reader/domain/usecases/discover_books.dart';
 import 'package:book_reader/domain/usecases/get_audio.dart';
 import 'package:book_reader/domain/usecases/get_book_info.dart';
 import 'package:book_reader/domain/usecases/get_chapter_content.dart';
+import 'package:book_reader/domain/usecases/get_related_books.dart';
 import 'package:book_reader/domain/usecases/resolve_chapter_content.dart';
 import 'package:book_reader/domain/usecases/search_books.dart';
 import 'package:book_reader/domain/usecases/test_book_source.dart';
@@ -259,6 +260,15 @@ final checkBookUpdatesProvider = Provider<CheckBookUpdates>((ref) {
 /// 发现/排行用例。
 final discoverBooksProvider = Provider<DiscoverBooks>((ref) {
   return DiscoverBooks(
+    aggregator: ref.watch(searchAggregatorProvider),
+    getEnabledSources: () =>
+        ref.watch(bookSourceRepositoryProvider).getEnabledSources(),
+  );
+});
+
+/// 相关推荐用例 (D-2)。
+final getRelatedBooksProvider = Provider<GetRelatedBooks>((ref) {
+  return GetRelatedBooks(
     aggregator: ref.watch(searchAggregatorProvider),
     getEnabledSources: () =>
         ref.watch(bookSourceRepositoryProvider).getEnabledSources(),

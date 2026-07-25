@@ -22,6 +22,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   bool _loadingInfo = true;
   bool _loadingToc = false;
   bool _loadingAudio = false;
+  bool _switchingSource = false;
   String? _error;
 
   /// 是否已在书架中。
@@ -29,6 +30,24 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
 
   /// 当前书架记录（若存在）。
   BookshelfEntry? _entry;
+
+  /// 当前生效的书源 URL。null 表示尚未确定（首次加载时由 _loadInfo 选定）。
+  String? _activeSourceUrl;
+
+  // ── 相关推荐 (D-2) ──────────────────────────────────────────
+  /// 相关推荐结果。
+  List<SearchResult> _related = const [];
+  bool _loadingRelated = false;
+
+  // ── 目录折叠 / 搜索 (D-3) ──────────────────────────────────────────
+  /// 是否处于目录搜索模式。
+  bool _tocSearchMode = false;
+
+  /// 目录搜索关键字。
+  String _tocQuery = '';
+
+  /// 已折叠的卷标名集合。
+  final Set<String> _collapsedVolumes = {};
 
   String get _id => BookshelfEntry.makeId(
       widget.searchResult.bookName, widget.searchResult.author);
@@ -38,6 +57,22 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     super.initState();
     _loadInfo();
     _loadBookshelfStatus();
+    _loadRelated();
+  }
+
+  /// D-2：异步加载相关推荐（不影响主信息加载）。
+  Future<void> _loadRelated() async {
+    setState(() => _loadingRelated = true);
+    try {
+      final useCase = ref.read(getRelatedBooksProvider);
+      final list = await useCase(widget.searchResult, limit: 6);
+      if (!mounted) return;
+      setState(() => _related = list);
+    } catch (_) {
+      // 静默：推荐是辅助信息
+    } finally {
+      if (mounted) setState(() => _loadingRelated = false);
+    }
   }
 
   Future<void> _loadBookshelfStatus() async {
@@ -93,14 +128,32 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     }
   }
 
-  Future<void> _loadInfo() async {
+  Future<void> _loadInfo({SearchSource? explicitSource}) async {
+    setState(() {
+      _loadingInfo = true;
+      _error = null;
+    });
     try {
       final useCase = ref.read(getBookInfoProvider);
-      final info = await useCase(widget.searchResult);
+      // 直接构造一个只含目标源的 SearchResult 来调用 useCase
+      final sr = explicitSource == null
+          ? widget.searchResult
+          : SearchResult(
+              bookName: widget.searchResult.bookName,
+              author: widget.searchResult.author,
+              coverUrl: widget.searchResult.coverUrl,
+              intro: widget.searchResult.intro,
+              kind: widget.searchResult.kind,
+              wordCount: widget.searchResult.wordCount,
+              lastChapter: widget.searchResult.lastChapter,
+              sources: [explicitSource],
+            );
+      final info = await useCase(sr);
       if (!mounted) return;
       setState(() {
         _info = info;
         _loadingInfo = false;
+        if (info != null) _activeSourceUrl = info.sourceUrl;
       });
       if (info != null) _loadToc(info);
     } catch (e) {
@@ -112,13 +165,57 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     }
   }
 
+  /// D-1：切换到指定书源，重新拉取详情 + 目录。
+  Future<void> _switchSource(SearchSource src) async {
+    if (_switchingSource) return;
+    if (src.sourceUrl == _activeSourceUrl) return;
+    setState(() {
+      _switchingSource = true;
+      _error = null;
+      _chapters = const [];
+      _collapsedVolumes.clear();
+      _tocQuery = '';
+      _tocSearchMode = false;
+    });
+    try {
+      final useCase = ref.read(getBookInfoProvider);
+      final sr = SearchResult(
+        bookName: widget.searchResult.bookName,
+        author: widget.searchResult.author,
+        coverUrl: widget.searchResult.coverUrl,
+        intro: widget.searchResult.intro,
+        kind: widget.searchResult.kind,
+        wordCount: widget.searchResult.wordCount,
+        lastChapter: widget.searchResult.lastChapter,
+        sources: [src],
+      );
+      final info = await useCase(sr);
+      if (!mounted) return;
+      setState(() {
+        _info = info;
+        _activeSourceUrl = info?.sourceUrl ?? src.sourceUrl;
+      });
+      if (info != null) {
+        await _loadToc(info);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '切换书源失败: $e');
+    } finally {
+      if (mounted) setState(() => _switchingSource = false);
+    }
+  }
+
   Future<void> _loadToc(BookInfo info) async {
     setState(() => _loadingToc = true);
     try {
       final useCase = ref.read(getTocProvider);
       final chapters = await useCase(info);
       if (!mounted) return;
-      setState(() => _chapters = chapters);
+      setState(() {
+        _chapters = chapters;
+        _collapsedVolumes.clear();
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = '目录加载失败: $e');
@@ -157,6 +254,169 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     }
   }
 
+  // ── D-3：目录折叠 / 搜索 ──────────────────────────────────────────
+
+  void _toggleVolume(String volumeName) {
+    setState(() {
+      if (_collapsedVolumes.contains(volumeName)) {
+        _collapsedVolumes.remove(volumeName);
+      } else {
+        _collapsedVolumes.add(volumeName);
+      }
+    });
+  }
+
+  void _collapseAllVolumes() {
+    setState(() {
+      _collapsedVolumes
+        ..clear()
+        ..addAll(_chapters.where((c) => c.isVolume).map((c) => c.name));
+    });
+  }
+
+  void _expandAllVolumes() {
+    setState(() => _collapsedVolumes.clear());
+  }
+
+  /// 当前应展示的章节列表：考虑搜索 + 折叠。
+  ///
+  /// 搜索模式下：忽略折叠，直接返回所有匹配的非卷标章节（卷标本身不参与匹配）。
+  /// 非搜索模式下：跳过被折叠卷标下的章节（直到下一个卷标为止）。
+  List<Chapter> get _visibleChapters {
+    if (_tocSearchMode && _tocQuery.isNotEmpty) {
+      final q = _tocQuery.toLowerCase();
+      return _chapters
+          .where((c) => !c.isVolume && c.name.toLowerCase().contains(q))
+          .toList();
+    }
+    final result = <Chapter>[];
+    bool skipping = false;
+    for (final c in _chapters) {
+      if (c.isVolume) {
+        skipping = _collapsedVolumes.contains(c.name);
+        result.add(c);
+        continue;
+      }
+      if (skipping) continue;
+      result.add(c);
+    }
+    return result;
+  }
+
+  /// 跳转到指定章节序号（用户输入）。
+  Future<void> _jumpToChapter() async {
+    if (_chapters.isEmpty) return;
+    final ctrl = TextEditingController();
+    final input = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('跳转到章节', style: TextStyle(fontSize: 16)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            hintText: '输入章节序号 (1 - ${_chapters.length})',
+            border: const OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+            child: const Text('跳转'),
+          ),
+        ],
+      ),
+    );
+    if (input == null) return;
+    final idx = int.tryParse(input);
+    if (idx == null || idx < 1 || idx > _chapters.length) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('请输入 1 - ${_chapters.length} 之间的数字')),
+      );
+      return;
+    }
+    final target = _chapters[idx - 1];
+    if (target.isVolume) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('该序号是卷标，不可阅读')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    _openReader(_chapters.indexOf(target));
+  }
+
+  void _openReader(int chapterIndex) {
+    final info = _info;
+    if (info == null) return;
+    context.go('/reader',
+        extra: ReaderArgs(
+          book: info,
+          chapters: _chapters,
+          initialIndex: chapterIndex,
+          alternatives: _buildAlternatives(),
+        ));
+  }
+
+  // ── D-4：封面大图预览 ──────────────────────────────────────────
+
+  void _showCoverPreview(String? coverUrl) {
+    if (coverUrl == null) return;
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => GestureDetector(
+        onTap: () => Navigator.of(ctx).pop(),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: SafeArea(
+            child: Stack(
+              children: [
+                Center(
+                  child: InteractiveViewer(
+                    maxScale: 4.0,
+                    minScale: 0.5,
+                    child: Image.network(
+                      coverUrl,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.broken_image,
+                              size: 80, color: Colors.white70),
+                          SizedBox(height: 12),
+                          Text('封面加载失败',
+                              style: TextStyle(color: Colors.white70)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: IconButton(
+                    icon: const Icon(Icons.close,
+                        color: Colors.white, size: 28),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sr = widget.searchResult;
@@ -188,14 +448,18 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (cover != null)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: Image.network(
-                            cover,
-                            width: 100,
-                            height: 140,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _coverPlaceholder(100, 140),
+                        GestureDetector(
+                          onTap: () => _showCoverPreview(cover),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Image.network(
+                              cover,
+                              width: 100,
+                              height: 140,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _coverPlaceholder(100, 140),
+                            ),
                           ),
                         )
                       else
@@ -257,6 +521,8 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     ],
                   ),
                 ),
+                // D-1: 多源对比区
+                _buildSourcesSection(),
                 if (intro != null) ...[
                   const Divider(),
                   Padding(
@@ -285,61 +551,20 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                       ],
                     ),
                   ),
+                // D-2: 相关推荐
+                _buildRelatedSection(),
                 const Divider(height: 1),
-                ListTile(
-                  dense: true,
-                  title: Text('目录 (${_chapters.length})',
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_loadingToc)
-                        const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2)),
-                      if (_info != null && _chapters.isNotEmpty)
-                        TextButton.icon(
-                          icon: const Icon(Icons.headphones, size: 18),
-                          label: const Text('听书'),
-                          onPressed: _loadingAudio ? null : _playAudio,
-                        ),
-                    ],
-                  ),
-                ),
+                // D-3: 目录头部（含搜索 + 折叠 + 跳转）
+                _buildTocHeader(),
+                if (_tocSearchMode) _buildTocSearchField(),
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Text(_error!,
                         style: TextStyle(color: Theme.of(context).colorScheme.error)),
                   ),
-                for (final c in _chapters)
-                  ListTile(
-                    dense: true,
-                    leading: Text('${c.index}',
-                        style: TextStyle(
-                            color: Colors.grey.shade500,
-                            fontSize: 12)),
-                    title: Text(c.name,
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: c.isVolume ? Colors.grey.shade500 : null,
-                            fontWeight:
-                                c.isVolume ? FontWeight.bold : FontWeight.normal)),
-                    trailing: c.isVip
-                        ? Icon(Icons.lock, size: 14, color: Colors.orange.shade400)
-                        : null,
-                    enabled: !c.isVolume,
-                    onTap: c.isVolume
-                        ? null
-                        : () => context.go('/reader',
-                            extra: ReaderArgs(
-                              book: info!,
-                              chapters: _chapters,
-                              initialIndex: _chapters.indexOf(c),
-                              alternatives: _buildAlternatives(),
-                            )),
-                  ),
+                // D-3: 目录列表（支持折叠 / 搜索过滤）
+                ..._buildChapterList(),
               ],
             ),
       bottomNavigationBar: _info == null || _chapters.isEmpty
@@ -400,6 +625,352 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     );
   }
 
+  // ── D-2: 相关推荐区 ──────────────────────────────────────────
+
+  Widget _buildRelatedSection() {
+    // 加载中：显示骨架行
+    if (_loadingRelated) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.recommend, size: 16),
+                const SizedBox(width: 6),
+                const Text('相关推荐',
+                    style:
+                        TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                const Spacer(),
+                const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 140,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: 4,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, __) => Container(
+                width: 90,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    if (_related.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: [
+              const Icon(Icons.recommend, size: 16),
+              const SizedBox(width: 6),
+              const Text('相关推荐',
+                  style:
+                      TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Text('${_related.length} 本',
+                  style:
+                      TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 160,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: _related.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, i) => _relatedBookCard(_related[i]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _relatedBookCard(SearchResult r) {
+    final cover = r.coverUrl;
+    return InkWell(
+      onTap: () => context.go('/book', extra: r),
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        width: 96,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (cover != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Image.network(
+                  cover,
+                  width: 96,
+                  height: 128,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _coverPlaceholder(96, 128),
+                ),
+              )
+            else
+              _coverPlaceholder(96, 128),
+            const SizedBox(height: 4),
+            Text(r.bookName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12)),
+            Text(r.author,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: Colors.grey.shade600, fontSize: 11)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── D-1: 多源对比区 ──────────────────────────────────────────
+
+  Widget _buildSourcesSection() {
+    final sources = widget.searchResult.sources;
+    if (sources.length <= 1) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            children: [
+              const Icon(Icons.layers, size: 16),
+              const SizedBox(width: 6),
+              Text('书源 (${sources.length})',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+              const Spacer(),
+              if (_switchingSource)
+                const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              for (final s in sources)
+                _sourceChip(s, isActive: s.sourceUrl == _activeSourceUrl),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sourceChip(SearchSource s, {required bool isActive}) {
+    return InkWell(
+      onTap: _switchingSource ? null : () => _switchSource(s),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isActive
+              ? Theme.of(context).colorScheme.primary.withOpacity(0.12)
+              : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isActive
+                ? Theme.of(context).colorScheme.primary
+                : Colors.transparent,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(s.sourceName,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.grey.shade800,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                )),
+            if (isActive) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.check_circle,
+                  size: 12, color: Theme.of(context).colorScheme.primary),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── D-3: 目录头部 ──────────────────────────────────────────
+
+  Widget _buildTocHeader() {
+    final hasVolumes = _chapters.any((c) => c.isVolume);
+    return ListTile(
+      dense: true,
+      title: Text('目录 (${_chapters.length})',
+          style: const TextStyle(fontWeight: FontWeight.w600)),
+      trailing: Wrap(
+        spacing: 0,
+        children: [
+          if (_loadingToc)
+            const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2)),
+          IconButton(
+            tooltip: _tocSearchMode ? '退出搜索' : '搜索章节',
+            icon: Icon(
+              _tocSearchMode ? Icons.search_off : Icons.search,
+              size: 20,
+            ),
+            onPressed: _chapters.isEmpty
+                ? null
+                : () => setState(() {
+                      _tocSearchMode = !_tocSearchMode;
+                      _tocQuery = '';
+                    }),
+          ),
+          IconButton(
+            tooltip: '跳转到章节',
+            icon: Icon(Icons.input, size: 20),
+            onPressed: _chapters.isEmpty ? null : _jumpToChapter,
+          ),
+          if (hasVolumes && !_tocSearchMode)
+            IconButton(
+              tooltip: _collapsedVolumes.isEmpty ? '全部折叠' : '全部展开',
+              icon: Icon(
+                _collapsedVolumes.isEmpty
+                    ? Icons.unfold_less
+                    : Icons.unfold_more,
+                size: 20,
+              ),
+              onPressed: () => _collapsedVolumes.isEmpty
+                  ? _collapseAllVolumes()
+                  : _expandAllVolumes(),
+            ),
+          if (_info != null && _chapters.isNotEmpty)
+            TextButton.icon(
+              icon: const Icon(Icons.headphones, size: 18),
+              label: const Text('听书'),
+              onPressed: _loadingAudio ? null : _playAudio,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTocSearchField() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: TextField(
+        autofocus: true,
+        onChanged: (v) => setState(() => _tocQuery = v),
+        controller: TextEditingController(text: _tocQuery),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: '输入章节名关键字',
+          prefixIcon: const Icon(Icons.search, size: 18),
+          suffixIcon: _tocQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  onPressed: () => setState(() => _tocQuery = ''),
+                )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildChapterList() {
+    final visible = _visibleChapters;
+    if (_tocSearchMode && _tocQuery.isNotEmpty) {
+      if (visible.isEmpty) {
+        return [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Center(
+              child: Text('没有匹配「$_tocQuery」的章节',
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+            ),
+          ),
+        ];
+      }
+      return [
+        for (final c in visible)
+          ListTile(
+            dense: true,
+            leading: Text('${c.index}',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+            title: Text(c.name,
+                style: const TextStyle(fontSize: 14)),
+            trailing: c.isVip
+                ? Icon(Icons.lock, size: 14, color: Colors.orange.shade400)
+                : null,
+            onTap: () => _openReader(_chapters.indexOf(c)),
+          ),
+      ];
+    }
+    return [
+      for (final c in visible)
+        ListTile(
+          dense: true,
+          leading: c.isVolume
+              ? const Icon(Icons.folder, size: 16, color: Colors.grey)
+              : Text('${c.index}',
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+          title: Text(c.name,
+              style: TextStyle(
+                  fontSize: 14,
+                  color: c.isVolume ? Colors.grey.shade500 : null,
+                  fontWeight:
+                      c.isVolume ? FontWeight.bold : FontWeight.normal)),
+          trailing: c.isVolume
+              ? Icon(
+                  _collapsedVolumes.contains(c.name)
+                      ? Icons.expand_more
+                      : Icons.expand_less,
+                  size: 18,
+                  color: Colors.grey.shade500)
+              : c.isVip
+                  ? Icon(Icons.lock, size: 14, color: Colors.orange.shade400)
+                  : null,
+          enabled: !c.isVolume,
+          onTap: c.isVolume
+              ? () => _toggleVolume(c.name)
+              : () => _openReader(_chapters.indexOf(c)),
+        ),
+    ];
+  }
+
   Widget _coverPlaceholder(double w, double h) {
     return Container(
       width: w,
@@ -414,7 +985,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   /// 用搜索结果中的多源信息构造最小 [BookInfo]，
   /// 供 ReaderPage 在遇到 VIP 章节时尝试跨源回退。
   List<BookInfo> _buildAlternatives() {
-    final currentUrl = _info?.sourceUrl ?? widget.searchResult.sources.first.sourceUrl;
+    final currentUrl = _activeSourceUrl ?? _info?.sourceUrl ?? widget.searchResult.sources.first.sourceUrl;
     return widget.searchResult.sources
         .where((s) => s.sourceUrl != currentUrl)
         .map((s) => BookInfo(
