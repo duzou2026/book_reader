@@ -1,0 +1,28 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+.fvm/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+
+# Generated
+**/*.g.dart
+**/*.freezed.dart
+!lib/data/models/*.g.dart
+!lib/data/models/*.freezed.dart
+
+# Misc
+*.log
