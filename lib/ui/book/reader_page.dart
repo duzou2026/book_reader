@@ -57,6 +57,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
   /// 滚动控制器（用于恢复阅读位置）。
   final _scrollController = ScrollController();
 
+  /// 翻页控制器（PageView 模式下使用）。
+  late final PageController _pageController;
+
   /// 阅读时长（秒）。
   int _readingSeconds = 0;
 
@@ -78,6 +81,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
     _currentIndex = widget.args.initialIndex;
     _currentBook = widget.args.book;
     _currentChapters = widget.args.chapters;
+    _pageController = PageController(initialPage: _currentIndex);
     _restoreProgress();
     _load();
     _startReadingTimer();
@@ -101,6 +105,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
     if (progress == null || !mounted) return;
     if (progress.chapterIndex < _currentChapters.length) {
       _currentIndex = progress.chapterIndex;
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(_currentIndex);
+      }
     }
   }
 
@@ -179,7 +186,24 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
 
   Future<void> _goChapter(int index) async {
     if (index < 0 || index >= _currentChapters.length) return;
-    _currentIndex = index;
+    final prefs = ref.read(readingPrefsProvider);
+    if (prefs.pageMode == PageMode.scroll) {
+      _currentIndex = index;
+      await _load();
+    } else {
+      // PageView 模式：通过 controller 跳页，onPageChanged 会触发 _load
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  /// PageView 翻页回调：用户左右滑动后加载新章节。
+  Future<void> _onPageChanged(int page) async {
+    if (page == _currentIndex) return;
+    _currentIndex = page;
     await _load();
   }
 
@@ -287,19 +311,53 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
     return '$m 分 $s 秒';
   }
 
+  /// 跟随系统夜间模式：若开启且系统为深色，自动切到夜间背景。
+  _Bg _resolveBackground(ReadingPrefs prefs, Brightness platformBrightness) {
+    final idx = (prefs.followSystemDark && platformBrightness == Brightness.dark)
+        ? 2
+        : prefs.backgroundIndex;
+    return _backgrounds[idx.clamp(0, _backgrounds.length - 1)];
+  }
+
+  /// 点击区域翻页：左 1/3 上一章，右 1/3 下一章，中间 1/3 呼出设置。
+  /// 仅在 PageView 模式下生效；scroll 模式保持滚动交互。
+  void _onTapRegion(TapUpDetails details, BoxConstraints constraints) {
+    final prefs = ref.read(readingPrefsProvider);
+    if (prefs.pageMode == PageMode.scroll) {
+      _openSettingsSheet();
+      return;
+    }
+    final dx = details.localPosition.dx;
+    final w = constraints.maxWidth;
+    if (dx < w / 3) {
+      if (_currentIndex > 0) _goChapter(_currentIndex - 1);
+    } else if (dx > w * 2 / 3) {
+      if (_currentIndex < _currentChapters.length - 1) {
+        _goChapter(_currentIndex + 1);
+      }
+    } else {
+      _openSettingsSheet();
+    }
+  }
+
   @override
   void dispose() {
     _persistProgress();
     _scrollController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final prefs = ref.watch(readingPrefsProvider);
-    final bg = _backgrounds[prefs.backgroundIndex.clamp(0, _backgrounds.length - 1)];
+    final platformBrightness = MediaQuery.platformBrightnessOf(context);
+    final bg = _resolveBackground(prefs, platformBrightness);
     final isOnSwitchedSource =
         _currentBook.sourceUrl != widget.args.book.sourceUrl;
+    final progressPercent = _currentChapters.isEmpty
+        ? 0.0
+        : (_currentIndex + 1) / _currentChapters.length;
     return Scaffold(
       backgroundColor: bg.color,
       appBar: AppBar(
@@ -355,99 +413,207 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
                     ],
                   ),
                 )
-              : GestureDetector(
-                  onTap: () {}, // 留空：所有操作通过 AppBar 完成
-                  child: ListView(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      Text(
-                        _currentChapter.name,
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: bg.foreground),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${_currentIndex + 1} / ${_currentChapters.length} · 已读 ${_formatReadingTime(_readingSeconds)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: bg.foreground.withOpacity(0.5),
-                        ),
-                      ),
-                      if (_lastResolved?.isVip == true &&
-                          _lastResolved?.switchedTo == null) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                                color: Colors.orange.withOpacity(0.4),
-                                width: 1),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.lock,
-                                  size: 16, color: Colors.orange),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  '本章为 VIP 章节，且未找到其他免费源',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: bg.foreground.withOpacity(0.8),
-                                  ),
-                                ),
-                              ),
-                              TextButton.icon(
-                                icon: const Icon(Icons.refresh, size: 14),
-                                label: const Text('重试换源',
-                                    style: TextStyle(fontSize: 12)),
-                                onPressed: _manualResolve,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      SelectionArea(
-                        child: Text(
-                          _content?.isNotEmpty == true
-                              ? _content!
-                              : '（本章内容为空）',
-                          style: TextStyle(
-                              fontSize: prefs.fontSize,
-                              height: prefs.lineHeight,
-                              color: bg.foreground),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          TextButton.icon(
-                            onPressed: _currentIndex > 0
-                                ? () => _goChapter(_currentIndex - 1)
-                                : null,
-                            icon: const Icon(Icons.chevron_left),
-                            label: const Text('上一章'),
-                          ),
-                          TextButton.icon(
-                            onPressed:
-                                _currentIndex < _currentChapters.length - 1
-                                    ? () => _goChapter(_currentIndex + 1)
-                                    : null,
-                            icon: const Icon(Icons.chevron_right),
-                            label: const Text('下一章'),
-                          ),
-                        ],
-                      ),
-                    ],
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapUp: (d) => _onTapRegion(d, constraints),
+                      child: prefs.pageMode == PageMode.scroll
+                          ? _buildScrollBody(prefs, bg)
+                          : _buildPagedBody(prefs, bg),
+                    );
+                  },
+                ),
+      bottomNavigationBar: _loading || _error != null
+          ? null
+          : SafeArea(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: bg.color,
+                  border: Border(
+                    top: BorderSide(
+                        color: bg.foreground.withOpacity(0.08), width: 0.5),
                   ),
                 ),
+                child: Row(
+                  children: [
+                    Text(
+                      '${_currentIndex + 1}/${_currentChapters.length}',
+                      style: TextStyle(
+                          fontSize: 11, color: bg.foreground.withOpacity(0.6)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(2),
+                        child: LinearProgressIndicator(
+                          value: progressPercent,
+                          minHeight: 3,
+                          backgroundColor: bg.foreground.withOpacity(0.1),
+                          valueColor: AlwaysStoppedAnimation(
+                            bg.foreground.withOpacity(0.5),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '已读 ${_formatReadingTime(_readingSeconds)}',
+                      style: TextStyle(
+                          fontSize: 11, color: bg.foreground.withOpacity(0.6)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  /// 滚动模式正文：保留原 ListView + 上下章按钮。
+  Widget _buildScrollBody(ReadingPrefs prefs, _Bg bg) {
+    return ListView(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          _currentChapter.name,
+          style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: bg.foreground),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${_currentIndex + 1} / ${_currentChapters.length}',
+          style: TextStyle(
+            fontSize: 11,
+            color: bg.foreground.withOpacity(0.5),
+          ),
+        ),
+        if (_lastResolved?.isVip == true &&
+            _lastResolved?.switchedTo == null) ...[
+          const SizedBox(height: 8),
+          _buildVipBlockedBanner(bg),
+        ],
+        const SizedBox(height: 16),
+        SelectionArea(
+          child: Text(
+            _content?.isNotEmpty == true ? _content! : '（本章内容为空）',
+            style: TextStyle(
+                fontSize: prefs.fontSize,
+                height: prefs.lineHeight,
+                color: bg.foreground),
+          ),
+        ),
+        const SizedBox(height: 32),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            TextButton.icon(
+              onPressed: _currentIndex > 0
+                  ? () => _goChapter(_currentIndex - 1)
+                  : null,
+              icon: const Icon(Icons.chevron_left),
+              label: const Text('上一章'),
+            ),
+            TextButton.icon(
+              onPressed: _currentIndex < _currentChapters.length - 1
+                  ? () => _goChapter(_currentIndex + 1)
+                  : null,
+              icon: const Icon(Icons.chevron_right),
+              label: const Text('下一章'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 左右翻页模式正文：PageView，每页一章。
+  Widget _buildPagedBody(ReadingPrefs prefs, _Bg bg) {
+    return PageView.builder(
+      controller: _pageController,
+      itemCount: _currentChapters.length,
+      onPageChanged: _onPageChanged,
+      itemBuilder: (context, index) {
+        final isCurrent = index == _currentIndex;
+        // 当前页用已加载内容；其他页用占位（翻到时再加载）
+        final content = isCurrent
+            ? (_content?.isNotEmpty == true ? _content! : '（本章内容为空）')
+            : _currentChapters[index].name;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _currentChapters[index].name,
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: bg.foreground),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${index + 1} / ${_currentChapters.length}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: bg.foreground.withOpacity(0.5),
+                ),
+              ),
+              if (isCurrent &&
+                  _lastResolved?.isVip == true &&
+                  _lastResolved?.switchedTo == null) ...[
+                const SizedBox(height: 8),
+                _buildVipBlockedBanner(bg),
+              ],
+              const SizedBox(height: 16),
+              SelectionArea(
+                child: Text(
+                  content,
+                  style: TextStyle(
+                      fontSize: prefs.fontSize,
+                      height: prefs.lineHeight,
+                      color: bg.foreground),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVipBlockedBanner(_Bg bg) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.orange.withOpacity(0.4), width: 1),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock, size: 16, color: Colors.orange),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '本章为 VIP 章节，且未找到其他免费源',
+              style: TextStyle(
+                fontSize: 12,
+                color: bg.foreground.withOpacity(0.8),
+              ),
+            ),
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.refresh, size: 14),
+            label: const Text('重试换源', style: TextStyle(fontSize: 12)),
+            onPressed: _manualResolve,
+          ),
+        ],
+      ),
     );
   }
 
