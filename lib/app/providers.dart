@@ -5,6 +5,7 @@ import 'package:book_reader/data/hive_book_source_repository.dart';
 import 'package:book_reader/data/notes_repository.dart';
 import 'package:book_reader/data/reading_history_repository.dart';
 import 'package:book_reader/data/reading_stats_repository.dart';
+import 'package:book_reader/data/remote_book_sources.dart';
 import 'package:book_reader/data/search_history_repository.dart';
 import 'package:book_reader/domain/usecases/check_book_updates.dart';
 import 'package:book_reader/domain/usecases/discover_books.dart';
@@ -99,6 +100,15 @@ final chapterCacheBoxProvider = Provider<Box<String>>((ref) {
 final bookSourceRepositoryProvider = Provider<BookSourceRepository>((ref) {
   final box = ref.watch(bookSourceBoxProvider);
   return HiveBookSourceRepository(box);
+});
+
+/// 远程书源获取器（从 GitHub 仓库拉取 + Hive 缓存）。
+///
+/// 用 bookSourceBox 作为缓存容器（key=`xiu2_sources`），
+/// 避免再开一个 Box 增加复杂度。
+final remoteBookSourcesProvider = Provider<RemoteBookSources>((ref) {
+  final box = ref.watch(bookSourceBoxProvider);
+  return RemoteBookSources(cacheBox: box);
 });
 
 final bookshelfRepositoryProvider = Provider<BookshelfRepository>((ref) {

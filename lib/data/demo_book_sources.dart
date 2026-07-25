@@ -1,115 +1,56 @@
-import 'package:book_reader/data/models/book_source.dart';
-
-/// 内置 demo 书源。
-///
-/// 这些书源**仅用于首次启动时让 App 不空**：
-/// - `enabled = false`：默认不启用，避免被真实搜索请求触发产生错误日志
-/// - `bookSourceGroup = 'demo'`：在书源管理页明确分组，方便用户识别/批量删除
-/// - 真正可用书源需要用户从「书源管理 → 导入」对话框粘贴 JSON 导入
-///
-/// 与 [recommendedBookSourceJson] 的关系：
-/// - 这里只是「App 内置占位」
-/// - `recommendedBookSourceJson` 是「推荐导入的真实书源 JSON 字符串」，
-///   可在书源管理页通过对话框粘贴或调用 `importRecommendedSources` 一键导入。
-List<BookSource> get demoBookSources => const [
-      BookSource(
-        bookSourceName: 'Demo · 笔趣阁（示例）',
-        bookSourceUrl: 'https://demo-local.example.com/biquge',
-        enabled: false,
-        bookSourceGroup: 'demo',
-        searchUrl:
-            'https://demo-local.example.com/biquge/search?q={{key}}',
-        ruleSearch: RuleSearch(
-          bookList: 'css:.result-list > .item',
-          name: 'css:.book-name@text',
-          author: 'css:.book-author@text',
-          bookUrl: 'css:.book-link@href',
-        ),
-        ruleBookInfo: RuleBookInfo(
-          name: 'css:h1.book-title@text',
-          author: 'css:.author@text',
-          intro: 'css:.intro@text',
-        ),
-        ruleToc: RuleToc(
-          chapterList: 'css:.chapter-list > li',
-          chapterName: 'css:a@text',
-          chapterUrl: 'css:a@href',
-        ),
-        ruleContent: RuleContent(
-          content: 'css:.chapter-content@html',
-        ),
-      ),
-      BookSource(
-        bookSourceName: 'Demo · 起点中文网（示例）',
-        bookSourceUrl: 'https://demo-local.example.com/qidian',
-        enabled: false,
-        bookSourceGroup: 'demo',
-        searchUrl: 'https://demo-local.example.com/qidian/search?kw={{key}}',
-        ruleSearch: RuleSearch(
-          bookList: 'css:.book-list > .item',
-          name: 'css:.book-name@text',
-          author: 'css:.author@text',
-          bookUrl: 'css:a@href',
-        ),
-      ),
-      BookSource(
-        bookSourceName: 'Demo · 番茄小说（示例）',
-        bookSourceUrl: 'https://demo-local.example.com/fanqie',
-        enabled: false,
-        bookSourceGroup: 'demo',
-        searchUrl: 'https://demo-local.example.com/fanqie/search?q={{key}}',
-        ruleSearch: RuleSearch(
-          bookList: 'css:.search-list > .item',
-          name: 'css:.title@text',
-          author: 'css:.author@text',
-          bookUrl: 'css:a@href',
-        ),
-      ),
-    ];
-
 /// 推荐导入的真实书源 JSON（legado 兼容格式）。
 ///
-/// 复制此字符串到「书源管理 → 导入」对话框即可一键导入。
-/// 这些是社区维护的常用书源模板，URL 已脱敏为占位符；
-/// 用户导入后可在书源管理页编辑具体规则或替换为最新 legado 书源订阅链接。
+/// 与 [RemoteBookSources] 的关系：
+/// - [RemoteBookSources] 从 GitHub 仓库拉取完整书源列表（约 26 条）
+/// - 此常量是「书源管理页 → 导入推荐书源」按钮使用的 JSON 字符串
+///   作为离线兜底（用户断网时也能手动导入 2 条精简版）
+///
+/// 这里只放一份精简版，完整版见仓库 `book_sources/xiu2_sources.json`。
 const String recommendedBookSourceJson = r'''
 [
   {
-    "bookSourceName": "笔趣阁",
-    "bookSourceUrl": "https://www.biquge.com",
+    "bookSourceName": "铅笔小说",
+    "bookSourceUrl": "https://www.23qb.com",
     "bookSourceType": 0,
     "enabled": true,
     "bookSourceGroup": "推荐",
-    "searchUrl": "https://www.biquge.com/search.php?q={{key}}",
+    "searchUrl": "/search.html?searchkey={{key}}",
     "ruleSearch": {
-      "bookList": "css:.result-list > .item",
-      "name": "css:.book-name@text",
-      "author": "css:.book-author@text",
-      "bookUrl": "css:.book-link@href"
+      "bookList": "class.module-search-item",
+      "bookUrl": "tag.a.0@href",
+      "coverUrl": "tag.img.0@data-src",
+      "intro": "class.novel-info-item.0@text",
+      "kind": "class.tag-link.0@tag.span.0@text## ##,",
+      "name": "tag.a.0@title"
     },
     "ruleBookInfo": {
-      "name": "css:h1.book-title@text",
-      "author": "css:.author@text",
-      "intro": "css:.intro@text"
+      "author": "//meta[@property='og:novel:author']/@content",
+      "coverUrl": "//meta[@property='og:image']/@content",
+      "intro": "//meta[@property='og:description']/@content",
+      "kind": "//meta[@property='og:novel:tags']/@content",
+      "lastChapter": "//meta[@property='og:novel:latest_chapter_name']/@content",
+      "name": "//meta[@property='og:novel:book_name']/@content",
+      "tocUrl": "class.catalog-more.0@href",
+      "wordCount": "class.novel-info-aux.0@tag.span.-1@text"
     },
     "ruleToc": {
-      "chapterList": "css:.chapter-list > li",
-      "chapterName": "css:a@text",
-      "chapterUrl": "css:a@href"
+      "chapterList": "class.module-row-text",
+      "chapterName": "tag.span.0@text",
+      "chapterUrl": "href"
     },
     "ruleContent": {
-      "content": "css:.chapter-content@html"
+      "content": "class.article-content.0@html##\\(本章完\\)"
     }
   },
   {
-    "bookSourceName": "起点中文网",
-    "bookSourceUrl": "https://www.qidian.com",
+    "bookSourceName": "八一中文",
+    "bookSourceUrl": "https://www.81zw2.com",
     "bookSourceType": 0,
     "enabled": true,
     "bookSourceGroup": "推荐",
-    "searchUrl": "https://www.qidian.com/search?kw={{key}}",
+    "searchUrl": "https://www.81zw2.com/s.php?q={{key}}",
     "ruleSearch": {
-      "bookList": "css:.book-list > .item",
+      "bookList": "css:.book-list > li",
       "name": "css:.book-name@text",
       "author": "css:.author@text",
       "bookUrl": "css:a@href"

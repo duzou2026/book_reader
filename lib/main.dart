@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/app/router.dart';
-import 'package:book_reader/data/demo_book_sources.dart';
+import 'package:book_reader/data/remote_book_sources.dart';
 import 'package:book_reader/services/preferences/theme_prefs_repository.dart';
 import 'package:book_reader/ui/settings/app_update_controller.dart';
 import 'package:flutter/material.dart';
@@ -28,8 +28,10 @@ Future<void> main() async {
   final readingStatsBox = await Hive.openBox<String>('reading_stats');
   final readingHistoryBox = await Hive.openBox<String>('reading_history');
   final chapterCacheBox = await Hive.openBox<String>('chapter_cache');
-  // 首次启动：内置 demo 书源（disabled + demo 分组），让 App 不空
-  await _seedDemoBookSources(bookSourceBox);
+  // 首次启动：从 GitHub 仓库远程拉取书源写入 Hive
+  // - 已有书源的用户不会再次写入，避免覆盖用户配置
+  // - 拉取失败时静默忽略，App 仍能启动（用户可在书源管理页点「刷新书源」重试）
+  await _seedRemoteBookSources(bookSourceBox);
   runApp(
     ProviderScope(
       overrides: [
@@ -49,13 +51,18 @@ Future<void> main() async {
   );
 }
 
-/// 仅在 `book_sources` Box 为空时写入 demo 书源。
+/// 仅在 `book_sources` Box 为空时，从 GitHub 仓库远程拉取书源写入。
 ///
-/// 已经导入过书源（或曾经手动删除过 demo 书源）的用户不会再次写入，
-/// 避免覆盖用户的现有配置。
-Future<void> _seedDemoBookSources(Box<String> box) async {
+/// 流程：
+///   1. Box 非空 → 已有书源（用户配置过），跳过
+///   2. Box 为空 → 通过 [RemoteBookSources] 拉取远程 JSON
+///      - 拉取成功 → 缓存到 box 的 `xiu2_sources` key + 逐条写入各书源 URL
+///      - 拉取失败 → 静默忽略，App 启动后用户可在书源管理页重试
+Future<void> _seedRemoteBookSources(Box<String> box) async {
   if (box.isNotEmpty) return;
-  for (final s in demoBookSources) {
+  final fetcher = RemoteBookSources(cacheBox: box);
+  final sources = await fetcher.fetch(forceRefresh: true);
+  for (final s in sources) {
     await box.put(s.bookSourceUrl, jsonEncode(s.toJson()));
   }
 }

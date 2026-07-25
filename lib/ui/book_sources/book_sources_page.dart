@@ -12,6 +12,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+/// 从 GitHub 仓库远程刷新书源：拉取最新 JSON → upsert 到 Hive。
+///
+/// 与「导入推荐书源」的区别：
+/// - 推荐书源是 [recommendedBookSourceJson] 常量，离线可用，但只有 2 条精简版
+/// - 远程刷新从 GitHub 仓库 `book_sources/xiu2_sources.json` 拉取完整版（26 条）
+///
+/// 维护方式：新增/删除书源只需修改 GitHub 仓库的 JSON 文件即可。
+
 class BookSourcesPage extends ConsumerStatefulWidget {
   const BookSourcesPage({super.key});
 
@@ -102,6 +110,57 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('导入失败：$e')),
+      );
+    }
+  }
+
+  /// 从 GitHub 仓库远程刷新书源。
+  ///
+  /// - 拉取最新 JSON → upsert 到 Hive（已有同 URL 的会被覆盖）
+  /// - 拉取失败时给出明确提示（断网 / GitHub 不可访问）
+  /// - 成功后自动刷新列表
+  Future<void> _refreshRemoteSources() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text('正在从 GitHub 拉取书源...'),
+          ],
+        ),
+        duration: Duration(seconds: 30),
+      ),
+    );
+    try {
+      final fetcher = ref.read(remoteBookSourcesProvider);
+      final sources = await fetcher.fetch(forceRefresh: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      if (sources.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('未拉取到书源，请检查网络')),
+        );
+        return;
+      }
+      final repo = ref.read(bookSourceRepositoryProvider);
+      for (final s in sources) {
+        await repo.upsert(s);
+      }
+      if (!mounted) return;
+      setState(_reload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已刷新 ${sources.length} 个书源')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('刷新失败：$e')),
       );
     }
   }
@@ -476,6 +535,11 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                   icon: const Icon(Icons.create_new_folder_outlined),
                   onPressed: () => _openEdit(),
                   tooltip: '新建书源',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.cloud_download_outlined),
+                  onPressed: _refreshRemoteSources,
+                  tooltip: '从 GitHub 刷新书源',
                 ),
                 IconButton(
                   icon: const Icon(Icons.recommend_outlined),
