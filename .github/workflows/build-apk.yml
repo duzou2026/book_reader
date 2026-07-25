@@ -64,7 +64,7 @@ jobs:
           fi
           echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
           {
-            echo "storeFile=app/release.keystore"
+            echo "storeFile=release.keystore"
             echo "storePassword=$STORE_PASSWORD"
             echo "keyAlias=$KEY_ALIAS"
             echo "keyPassword=$KEY_PASSWORD"
