@@ -6,6 +6,10 @@ on:
     tags:
       - 'v*'
 
+# 默认 GITHUB_TOKEN 只有读权限，需要显式声明 contents: write 才能创建 Release
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build Release APK
