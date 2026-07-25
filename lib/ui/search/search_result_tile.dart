@@ -1,4 +1,5 @@
 import 'package:book_reader/data/models/search_result.dart';
+import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -27,11 +28,11 @@ class SearchResultTile extends StatelessWidget {
                     width: 60,
                     height: 80,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _coverPlaceholder(),
+                    errorBuilder: (_, __, ___) => _coverPlaceholder(context),
                   ),
                 )
               else
-                _coverPlaceholder(),
+                _coverPlaceholder(context),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -45,7 +46,7 @@ class SearchResultTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       result.author,
-                      style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                      style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 13),
                     ),
                     if (result.intro != null) ...[
                       const SizedBox(height: 4),
@@ -53,7 +54,7 @@ class SearchResultTile extends StatelessWidget {
                         result.intro!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                        style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12),
                       ),
                     ],
                     const SizedBox(height: 6),
@@ -79,12 +80,12 @@ class SearchResultTile extends StatelessWidget {
     );
   }
 
-  Widget _coverPlaceholder() {
+  Widget _coverPlaceholder(BuildContext context) {
     return Container(
       width: 60,
       height: 80,
-      color: Colors.grey.shade200,
-      child: const Icon(Icons.book, color: Colors.grey),
+      color: ThemeColors.surfaceLevel2(context),
+      child: Icon(Icons.book, color: ThemeColors.mutedText(context)),
     );
   }
 }

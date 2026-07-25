@@ -2,6 +2,7 @@ import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/models/audio_chapter.dart';
 import 'package:book_reader/data/models/book_info.dart';
 import 'package:book_reader/data/models/search_result.dart';
+import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -82,7 +83,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                       Text(
                         state.book?.author ?? '',
                         style: TextStyle(
-                            color: Colors.grey.shade700, fontSize: 13),
+                            color: ThemeColors.mutedText(context), fontSize: 13),
                       ),
                     ],
                   ),
@@ -100,7 +101,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                   child: Row(
                     children: [
                       Text(_fmt(state.position),
-                          style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          style: TextStyle(fontSize: 11, color: ThemeColors.mutedText(context))),
                       Expanded(
                         child: Slider(
                           value: state.position.inMilliseconds.toDouble(),
@@ -115,7 +116,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                         ),
                       ),
                       Text(_fmt(state.duration),
-                          style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          style: TextStyle(fontSize: 11, color: ThemeColors.mutedText(context))),
                     ],
                   ),
                 ),
@@ -187,7 +188,7 @@ class _AudioPlayerPageState extends ConsumerState<AudioPlayerPage> {
                           size: 18,
                           color: isCurrent
                               ? Theme.of(context).colorScheme.primary
-                              : Colors.grey,
+                              : ThemeColors.mutedText(context),
                         ),
                         title: Text(c.name,
                             style: TextStyle(

@@ -1,5 +1,4 @@
 import 'package:book_reader/data/models/book_source.dart';
-import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/domain/usecases/search_books.dart';
 import 'package:book_reader/services/http/book_source_fetcher.dart';
 import 'package:book_reader/services/rule_engine/rule_engine.dart';
@@ -36,6 +35,12 @@ class _FakeRepository implements BookSourceRepository {
 
   @override
   Future<void> setEnabled(String bookSourceUrl, bool enabled) async {}
+
+  @override
+  Future<bool> contains(String bookSourceUrl) async => false;
+
+  @override
+  Future<void> clear() async {}
 }
 
 void main() {

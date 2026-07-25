@@ -1,6 +1,7 @@
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/domain/usecases/discover_books.dart';
 import 'package:book_reader/data/models/search_result.dart';
+import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,7 +26,6 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   String? _error;
   int _completed = 0;
   int _total = 0;
-  Map<String, String> _sourceStatus = const {};
 
   @override
   void initState() {
@@ -40,7 +40,6 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
       _results = const [];
       _completed = 0;
       _total = 0;
-      _sourceStatus = const {};
     });
     try {
       final list = await ref.read(discoverBooksProvider).fetch(
@@ -50,7 +49,6 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
           setState(() {
             _completed = p.completed;
             _total = p.total;
-            _sourceStatus = Map.unmodifiable(p.sourceStatus);
           });
         },
       );
@@ -117,7 +115,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
             LinearProgressIndicator(
               value: _completed / _total,
               minHeight: 2,
-              backgroundColor: Colors.grey.shade200,
+              backgroundColor: ThemeColors.surfaceLevel2(context),
             ),
           // 状态行
           if (_loading)
@@ -131,7 +129,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                       child: CircularProgressIndicator(strokeWidth: 2)),
                   const SizedBox(width: 8),
                   Text('$_completed / $_total 源已返回，已聚合 ${_results.length} 本',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      style: TextStyle(fontSize: 12, color: ThemeColors.mutedText(context))),
                 ],
               ),
             ),
@@ -167,12 +165,12 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.inbox, size: 64, color: Colors.grey),
+            Icon(Icons.inbox, size: 64, color: ThemeColors.mutedText(context)),
             const SizedBox(height: 12),
             const Text('该分类暂无结果'),
             const SizedBox(height: 6),
-            const Text('请确认已导入并启用书源',
-                style: TextStyle(color: Colors.grey, fontSize: 12)),
+            Text('请确认已导入并启用书源',
+                style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12)),
             const SizedBox(height: 16),
             FilledButton.tonalIcon(
               onPressed: () => context.go('/book-sources'),
@@ -210,11 +208,11 @@ class _BookRankTile extends StatelessWidget {
     required this.onTap,
   });
 
-  Color _rankColor() {
+  Color _rankColor(BuildContext context) {
     if (rank == 1) return const Color(0xFFE53935);
     if (rank == 2) return const Color(0xFFFB8C00);
     if (rank == 3) return const Color(0xFFFDD835);
-    return Colors.grey;
+    return ThemeColors.mutedText(context);
   }
 
   @override
@@ -233,7 +231,7 @@ class _BookRankTile extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: _rankColor(),
+                color: _rankColor(context),
               ),
             ),
           ),
@@ -247,10 +245,10 @@ class _BookRankTile extends StatelessWidget {
                     height: 70,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) =>
-                        _placeholder(50, 70),
+                        _placeholder(context, 50, 70),
                   ),
                 )
-              : _placeholder(50, 70),
+              : _placeholder(context, 50, 70),
         ],
       ),
       title: Row(
@@ -283,7 +281,7 @@ class _BookRankTile extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             result.author,
-            style: const TextStyle(color: Colors.grey, fontSize: 12),
+            style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -323,11 +321,11 @@ class _BookRankTile extends StatelessWidget {
     );
   }
 
-  Widget _placeholder(double w, double h) {
+  Widget _placeholder(BuildContext context, double w, double h) {
     return Container(
       width: w,
       height: h,
-      color: Colors.grey.shade300,
+      color: ThemeColors.surfaceLevel2(context),
       child: const Icon(Icons.book, color: Colors.white54),
     );
   }

@@ -9,6 +9,7 @@ import 'package:book_reader/ui/book/reading_history_page.dart';
 import 'package:book_reader/ui/book_sources/book_source_edit_page.dart';
 import 'package:book_reader/ui/book_sources/book_sources_page.dart';
 import 'package:book_reader/ui/search/search_page.dart';
+import 'package:book_reader/ui/settings/settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -42,6 +43,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/discover',
       builder: (context, state) => const DiscoverPage(),
+    ),
+    GoRoute(
+      path: '/settings',
+      builder: (context, state) => const SettingsPage(),
     ),
     GoRoute(
       path: '/book',

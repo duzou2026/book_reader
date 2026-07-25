@@ -1,6 +1,7 @@
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/data/reading_history_repository.dart';
+import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -160,12 +161,12 @@ class _ReadingHistoryPageState extends ConsumerState<ReadingHistoryPage>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.history, size: 64, color: Colors.grey),
+                Icon(Icons.history, size: 64, color: ThemeColors.mutedText(context)),
                 const SizedBox(height: 12),
                 const Text('暂无阅读历史'),
                 const SizedBox(height: 6),
-                const Text('阅读任意章节后会在此显示',
-                    style: TextStyle(color: Colors.grey, fontSize: 12)),
+                Text('阅读任意章节后会在此显示',
+                    style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12)),
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: () => context.go('/search'),
@@ -229,10 +230,10 @@ class _ReadingHistoryPageState extends ConsumerState<ReadingHistoryPage>
                             height: 70,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) =>
-                                _coverPlaceholder(50, 70),
+                                _coverPlaceholder(context, 50, 70),
                           ),
                         )
-                      : _coverPlaceholder(50, 70),
+                      : _coverPlaceholder(context, 50, 70),
                   title: Row(
                     children: [
                       Expanded(
@@ -246,8 +247,8 @@ class _ReadingHistoryPageState extends ConsumerState<ReadingHistoryPage>
                       const SizedBox(width: 8),
                       Text(
                         _formatTime(e.readAt),
-                        style: const TextStyle(
-                            color: Colors.grey, fontSize: 11),
+                        style: TextStyle(
+                            color: ThemeColors.mutedText(context), fontSize: 11),
                       ),
                     ],
                   ),
@@ -257,8 +258,8 @@ class _ReadingHistoryPageState extends ConsumerState<ReadingHistoryPage>
                       const SizedBox(height: 4),
                       Text(
                         '${e.author} · ${e.sourceName}',
-                        style: const TextStyle(
-                            color: Colors.grey, fontSize: 12),
+                        style: TextStyle(
+                            color: ThemeColors.mutedText(context), fontSize: 12),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -287,11 +288,11 @@ class _ReadingHistoryPageState extends ConsumerState<ReadingHistoryPage>
     );
   }
 
-  Widget _coverPlaceholder(double w, double h) {
+  Widget _coverPlaceholder(BuildContext context, double w, double h) {
     return Container(
       width: w,
       height: h,
-      color: Colors.grey.shade300,
+      color: ThemeColors.surfaceLevel2(context),
       child: const Icon(Icons.book, color: Colors.white54),
     );
   }

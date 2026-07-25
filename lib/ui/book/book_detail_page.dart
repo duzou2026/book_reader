@@ -3,7 +3,9 @@ import 'package:book_reader/data/bookshelf_repository.dart';
 import 'package:book_reader/data/models/book_info.dart';
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/ui/audio/audio_player_page.dart';
+import 'package:book_reader/ui/book/chapter_download_sheet.dart';
 import 'package:book_reader/ui/book/reader_page.dart';
+import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -475,7 +477,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                             const SizedBox(height: 6),
                             Text(author,
                                 style: TextStyle(
-                                    color: Colors.grey.shade700, fontSize: 14)),
+                                    color: ThemeColors.mutedText(context), fontSize: 14)),
                             if (kind != null) ...[
                               const SizedBox(height: 6),
                               Wrap(
@@ -494,7 +496,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                               const SizedBox(height: 6),
                               Text('$wordCount · 共 ${_chapters.length} 章',
                                   style: TextStyle(
-                                      color: Colors.grey.shade600, fontSize: 12)),
+                                      color: ThemeColors.mutedText(context), fontSize: 12)),
                             ],
                             const SizedBox(height: 10),
                             // 加入书架按钮
@@ -543,11 +545,11 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Row(
                       children: [
-                        Icon(Icons.history, size: 16, color: Colors.grey.shade600),
+                        Icon(Icons.history, size: 16, color: ThemeColors.mutedText(context)),
                         const SizedBox(width: 6),
                         Text('最新: $lastChapter',
                             style: TextStyle(
-                                color: Colors.grey.shade600, fontSize: 12)),
+                                color: ThemeColors.mutedText(context), fontSize: 12)),
                       ],
                     ),
                   ),
@@ -576,7 +578,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface,
                   border: Border(
-                      top: BorderSide(color: Colors.grey.shade300, width: 0.5)),
+                      top: BorderSide(color: ThemeColors.outline(context), width: 0.5)),
                 ),
                 child: Row(
                   children: [
@@ -661,7 +663,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
               itemBuilder: (_, __) => Container(
                 width: 90,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: ThemeColors.surfaceLevel1(context),
                   borderRadius: BorderRadius.circular(6),
                 ),
               ),
@@ -687,7 +689,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
               const Spacer(),
               Text('${_related.length} 本',
                   style:
-                      TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                      TextStyle(color: ThemeColors.mutedText(context), fontSize: 12)),
             ],
           ),
         ),
@@ -737,7 +739,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                    color: Colors.grey.shade600, fontSize: 11)),
+                    color: ThemeColors.mutedText(context), fontSize: 11)),
           ],
         ),
       ),
@@ -795,7 +797,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
         decoration: BoxDecoration(
           color: isActive
               ? Theme.of(context).colorScheme.primary.withOpacity(0.12)
-              : Colors.grey.shade100,
+              : ThemeColors.surfaceLevel1(context),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isActive
@@ -812,7 +814,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                   fontSize: 12,
                   color: isActive
                       ? Theme.of(context).colorScheme.primary
-                      : Colors.grey.shade800,
+                      : ThemeColors.mutedText(context),
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                 )),
             if (isActive) ...[
@@ -859,6 +861,18 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
             tooltip: '跳转到章节',
             icon: Icon(Icons.input, size: 20),
             onPressed: _chapters.isEmpty ? null : _jumpToChapter,
+          ),
+          IconButton(
+            tooltip: '离线下载',
+            icon: const Icon(Icons.download_for_offline, size: 20),
+            onPressed: _chapters.isEmpty || _info == null
+                ? null
+                : () => ChapterDownloadSheet.show(
+                      context,
+                      book: _info!,
+                      chapters: _chapters,
+                      currentIndex: 0,
+                    ),
           ),
           if (hasVolumes && !_tocSearchMode)
             IconButton(
@@ -919,7 +933,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
             padding: const EdgeInsets.all(16),
             child: Center(
               child: Text('没有匹配「$_tocQuery」的章节',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                  style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 13)),
             ),
           ),
         ];
@@ -929,7 +943,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           ListTile(
             dense: true,
             leading: Text('${c.index}',
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12)),
             title: Text(c.name,
                 style: const TextStyle(fontSize: 14)),
             trailing: c.isVip
@@ -944,13 +958,13 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
         ListTile(
           dense: true,
           leading: c.isVolume
-              ? const Icon(Icons.folder, size: 16, color: Colors.grey)
+              ? Icon(Icons.folder, size: 16, color: ThemeColors.mutedText(context))
               : Text('${c.index}',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                  style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12)),
           title: Text(c.name,
               style: TextStyle(
                   fontSize: 14,
-                  color: c.isVolume ? Colors.grey.shade500 : null,
+                  color: c.isVolume ? ThemeColors.mutedText(context) : null,
                   fontWeight:
                       c.isVolume ? FontWeight.bold : FontWeight.normal)),
           trailing: c.isVolume
@@ -959,7 +973,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                       ? Icons.expand_more
                       : Icons.expand_less,
                   size: 18,
-                  color: Colors.grey.shade500)
+                  color: ThemeColors.mutedText(context))
               : c.isVip
                   ? Icon(Icons.lock, size: 14, color: Colors.orange.shade400)
                   : null,
@@ -975,8 +989,8 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     return Container(
       width: w,
       height: h,
-      color: Colors.grey.shade200,
-      child: const Icon(Icons.book, color: Colors.grey),
+      color: ThemeColors.surfaceLevel2(context),
+      child: Icon(Icons.book, color: ThemeColors.mutedText(context)),
     );
   }
 

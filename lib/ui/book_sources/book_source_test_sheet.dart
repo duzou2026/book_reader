@@ -1,6 +1,7 @@
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/models/book_source.dart';
 import 'package:book_reader/domain/usecases/test_book_source.dart';
+import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -79,7 +80,7 @@ class _BookSourceTestSheetState extends ConsumerState<BookSourceTestSheet> {
                     Text(
                       widget.source.bookSourceName,
                       style: TextStyle(
-                          color: Colors.grey.shade600, fontSize: 12),
+                          color: ThemeColors.mutedText(context), fontSize: 12),
                     ),
                   ],
                 ),
@@ -89,14 +90,14 @@ class _BookSourceTestSheetState extends ConsumerState<BookSourceTestSheet> {
                   label: Text(allOk ? '通过' : '存在问题',
                       style: const TextStyle(fontSize: 12)),
                   backgroundColor: allOk
-                      ? Colors.green.shade50
-                      : (hasFail ? Colors.orange.shade50 : Colors.grey.shade100),
+                      ? ThemeColors.successContainer(context)
+                      : (hasFail ? Colors.orange.shade50 : ThemeColors.surfaceLevel1(context)),
                   side: BorderSide.none,
                   avatar: Icon(
                     allOk ? Icons.check_circle : Icons.warning_amber,
                     size: 18,
                     color: allOk
-                        ? Colors.green.shade700
+                        ? ThemeColors.successText(context)
                         : Colors.orange.shade700,
                   ),
                 ),
@@ -115,7 +116,7 @@ class _BookSourceTestSheetState extends ConsumerState<BookSourceTestSheet> {
             Text(
               _summarize(),
               style: TextStyle(
-                color: allOk ? Colors.green.shade700 : Colors.grey.shade600,
+                color: allOk ? ThemeColors.successText(context) : ThemeColors.mutedText(context),
                 fontSize: 12,
               ),
             ),
@@ -182,7 +183,7 @@ class _BookSourceTestSheetState extends ConsumerState<BookSourceTestSheet> {
     final icon = _stepIcons[name] ?? Icons.circle_outlined;
     final (color, statusText, statusIcon) = switch (state) {
       _StepState.pending => (
-          Colors.grey.shade400,
+          ThemeColors.mutedText(context),
           '等待中',
           const SizedBox(
             width: 14,
@@ -200,14 +201,14 @@ class _BookSourceTestSheetState extends ConsumerState<BookSourceTestSheet> {
           ),
         ),
       _StepState.ok => (
-          Colors.green.shade600,
+          ThemeColors.successText(context),
           elapsedMs == null ? '通过' : '${elapsedMs}ms',
-          Icon(Icons.check_circle, size: 16, color: Colors.green.shade600),
+          Icon(Icons.check_circle, size: 16, color: ThemeColors.successText(context)),
         ),
       _StepState.fail => (
-          Colors.red.shade600,
+          ThemeColors.errorText(context),
           elapsedMs == null ? '失败' : '失败 · ${elapsedMs}ms',
-          Icon(Icons.cancel, size: 16, color: Colors.red.shade600),
+          Icon(Icons.cancel, size: 16, color: ThemeColors.errorText(context)),
         ),
     };
     return Padding(
@@ -222,7 +223,7 @@ class _BookSourceTestSheetState extends ConsumerState<BookSourceTestSheet> {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

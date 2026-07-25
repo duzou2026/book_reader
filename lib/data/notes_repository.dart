@@ -104,4 +104,19 @@ class NoteRepository {
   }
 
   Future<bool> exists(String id) => Future.value(_box.containsKey(id));
+
+  /// 删除某本书的所有笔记。
+  Future<void> deleteByBook(String bookId) async {
+    final all = await getAll();
+    for (final n in all) {
+      if (n.bookId == bookId) {
+        await _box.delete(n.id);
+      }
+    }
+  }
+
+  /// 清空所有笔记。
+  Future<void> clear() async {
+    await _box.clear();
+  }
 }

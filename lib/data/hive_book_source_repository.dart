@@ -45,4 +45,14 @@ class HiveBookSourceRepository implements BookSourceRepository {
     final source = BookSource.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     await _box.put(bookSourceUrl, jsonEncode(source.copyWith(enabled: enabled).toJson()));
   }
+
+  @override
+  Future<bool> contains(String bookSourceUrl) async {
+    return _box.containsKey(bookSourceUrl);
+  }
+
+  @override
+  Future<void> clear() async {
+    await _box.clear();
+  }
 }

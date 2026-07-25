@@ -1,5 +1,6 @@
 import 'package:book_reader/data/bookshelf_repository.dart';
 import 'package:book_reader/data/bookmarks_repository.dart';
+import 'package:book_reader/data/chapter_cache_repository.dart';
 import 'package:book_reader/data/hive_book_source_repository.dart';
 import 'package:book_reader/data/notes_repository.dart';
 import 'package:book_reader/data/reading_history_repository.dart';
@@ -7,9 +8,11 @@ import 'package:book_reader/data/reading_stats_repository.dart';
 import 'package:book_reader/data/search_history_repository.dart';
 import 'package:book_reader/domain/usecases/check_book_updates.dart';
 import 'package:book_reader/domain/usecases/discover_books.dart';
+import 'package:book_reader/domain/usecases/download_chapters.dart';
 import 'package:book_reader/domain/usecases/get_audio.dart';
 import 'package:book_reader/domain/usecases/get_book_info.dart';
 import 'package:book_reader/domain/usecases/get_chapter_content.dart';
+import 'package:book_reader/domain/usecases/bookshelf_backup.dart';
 import 'package:book_reader/domain/usecases/get_related_books.dart';
 import 'package:book_reader/domain/usecases/resolve_chapter_content.dart';
 import 'package:book_reader/domain/usecases/search_books.dart';
@@ -25,6 +28,7 @@ import 'package:book_reader/services/http/book_source_fetcher.dart';
 import 'package:book_reader/services/http/dio_book_source_fetcher.dart';
 import 'package:book_reader/services/preferences/reading_progress_repository.dart';
 import 'package:book_reader/services/preferences/reading_prefs_repository.dart';
+import 'package:book_reader/services/preferences/theme_prefs_repository.dart';
 import 'package:book_reader/services/tts/tts_service.dart';
 import 'package:book_reader/services/rule_engine/rule_engine.dart';
 import 'package:book_reader/services/search/search_aggregator.dart';
@@ -86,6 +90,12 @@ final readingHistoryBoxProvider = Provider<Box<String>>((ref) {
       'readingHistoryBoxProvider 必须在 main.dart 中 override');
 });
 
+/// 章节缓存 Box（E-1 离线下载）。
+final chapterCacheBoxProvider = Provider<Box<String>>((ref) {
+  throw UnimplementedError(
+      'chapterCacheBoxProvider 必须在 main.dart 中 override');
+});
+
 final bookSourceRepositoryProvider = Provider<BookSourceRepository>((ref) {
   final box = ref.watch(bookSourceBoxProvider);
   return HiveBookSourceRepository(box);
@@ -135,6 +145,11 @@ final readingHistoryRepositoryProvider =
   return ReadingHistoryRepository(ref.watch(readingHistoryBoxProvider));
 });
 
+/// 章节缓存仓储（E-1）。
+final chapterCacheRepositoryProvider = Provider<ChapterCacheRepository>((ref) {
+  return ChapterCacheRepository(ref.watch(chapterCacheBoxProvider));
+});
+
 /// TTS 服务（默认 NoOp，移动端可 override 为 flutter_tts 实现）。
 final ttsServiceProvider = Provider<TtsService>((ref) {
   return NoOpTtsService();
@@ -145,6 +160,18 @@ final readingPrefsProvider =
     StateNotifierProvider<ReadingPrefsNotifier, ReadingPrefs>((ref) {
   final repo = ref.watch(readingPrefsRepositoryProvider);
   return ReadingPrefsNotifier(repo);
+});
+
+/// 主题偏好仓储（复用 readingPrefsBox，独立 key）。
+final themePrefsRepositoryProvider = Provider<ThemePrefsRepository>((ref) {
+  return ThemePrefsRepository(ref.watch(readingPrefsBoxProvider));
+});
+
+/// 全局主题偏好（响应式）。
+final themePrefsProvider =
+    StateNotifierProvider<ThemePrefsNotifier, ThemePrefs>((ref) {
+  final repo = ref.watch(themePrefsRepositoryProvider);
+  return ThemePrefsNotifier(repo);
 });
 
 final fetcherProvider = Provider<BookSourceFetcher>((ref) {
@@ -237,6 +264,43 @@ final resolveChapterContentProvider = Provider<ResolveChapterContent>((ref) {
   return ResolveChapterContent(
     getContent: ref.watch(getChapterContentProvider),
     resolver: ref.watch(crossSourceContentResolverProvider),
+    cache: ref.watch(chapterCacheRepositoryProvider),
+  );
+});
+
+/// 批量下载章节用例（E-1）。
+final downloadChaptersProvider = Provider<DownloadChapters>((ref) {
+  return DownloadChapters(
+    getContent: ref.watch(getChapterContentProvider),
+    cache: ref.watch(chapterCacheRepositoryProvider),
+  );
+});
+
+/// 导出书架备份用例（E-4）。
+final exportBookshelfBackupProvider = Provider<ExportBookshelfBackup>((ref) {
+  return ExportBookshelfBackup(
+    bookshelfRepo: ref.watch(bookshelfRepositoryProvider),
+    progressRepo: ref.watch(readingProgressRepositoryProvider),
+    noteRepo: ref.watch(noteRepositoryProvider),
+    bookmarkRepo: ref.watch(bookmarkRepositoryProvider),
+    statsRepo: ref.watch(readingStatsRepositoryProvider),
+    historyRepo: ref.watch(readingHistoryRepositoryProvider),
+    sourceRepo: ref.watch(bookSourceRepositoryProvider),
+    prefsRepo: ref.watch(readingPrefsRepositoryProvider),
+  );
+});
+
+/// 恢复书架备份用例（E-4）。
+final restoreBookshelfBackupProvider = Provider<RestoreBookshelfBackup>((ref) {
+  return RestoreBookshelfBackup(
+    bookshelfRepo: ref.watch(bookshelfRepositoryProvider),
+    progressRepo: ref.watch(readingProgressRepositoryProvider),
+    noteRepo: ref.watch(noteRepositoryProvider),
+    bookmarkRepo: ref.watch(bookmarkRepositoryProvider),
+    statsRepo: ref.watch(readingStatsRepositoryProvider),
+    historyRepo: ref.watch(readingHistoryRepositoryProvider),
+    sourceRepo: ref.watch(bookSourceRepositoryProvider),
+    prefsRepo: ref.watch(readingPrefsRepositoryProvider),
   );
 });
 

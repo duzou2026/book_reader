@@ -16,6 +16,12 @@ abstract class BookSourceRepository {
 
   /// 仅切换 [enabled] 字段（不影响其他字段）。
   Future<void> setEnabled(String bookSourceUrl, bool enabled);
+
+  /// 是否存在指定 URL 的书源。
+  Future<bool> contains(String bookSourceUrl);
+
+  /// 清空全部书源。
+  Future<void> clear();
 }
 
 /// 搜索用例：domain 层入口。

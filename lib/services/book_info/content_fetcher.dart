@@ -1,4 +1,5 @@
 import 'package:book_reader/data/models/book_source.dart';
+import 'package:book_reader/services/book_info/content_purifier.dart';
 import 'package:book_reader/services/http/book_source_fetcher.dart';
 import 'package:book_reader/services/rule_engine/rule_engine.dart';
 
@@ -68,22 +69,15 @@ class ContentFetcher {
   ///   - `regex` → 替换为空
   ///   - `regex##replacement` → 替换为 replacement
   ///   - 多条规则用 `||` 或 `\n` 分隔
+  ///   - 替换串中可引用捕获组：`$1`、`$2`、`$<name>`
+  ///   - 正则内联 flag：`(?i)xxx`、`(?s:.)`（Dart RegExp 原生支持）
+  ///
+  /// 示例：
+  ///   `广告.*?\n` → 删除「广告」所在整行
+  ///   `(http[^\\s]+)##<a href="$1">$1</a>` → URL 转超链接
+  ///   `(?i)ERROR` → 删除 ERROR / error / Error（大小写不敏感）
   String _applyReplaceRegex(String content, String replaceRegex) {
-    var result = content;
-    final rules = replaceRegex.split(RegExp(r'\|\||\n'));
-    for (final r in rules) {
-      final trimmed = r.trim();
-      if (trimmed.isEmpty) continue;
-      final parts = trimmed.split('##');
-      try {
-        final pattern = RegExp(parts[0]);
-        final replacement = parts.length > 1 ? parts[1] : '';
-        result = result.replaceAll(pattern, replacement);
-      } catch (_) {
-        // 无效正则跳过
-      }
-    }
-    return result;
+    return ContentPurifier.purify(content, replaceRegex);
   }
 
   String _resolveUrl(String url, String baseUrl) {

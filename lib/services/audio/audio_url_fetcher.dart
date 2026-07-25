@@ -1,4 +1,3 @@
-import 'package:book_reader/data/models/audio_chapter.dart';
 import 'package:book_reader/data/models/book_source.dart';
 import 'package:book_reader/services/http/book_source_fetcher.dart';
 import 'package:book_reader/services/rule_engine/rule_engine.dart';

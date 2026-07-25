@@ -1,4 +1,3 @@
-import 'package:book_reader/data/models/book_info.dart';
 import 'package:book_reader/data/models/book_source.dart';
 import 'package:book_reader/services/book_info/book_info_fetcher.dart';
 import 'package:book_reader/services/http/book_source_fetcher.dart';

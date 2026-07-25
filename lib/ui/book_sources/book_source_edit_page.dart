@@ -1,5 +1,7 @@
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/models/book_source.dart';
+import 'package:book_reader/services/book_info/content_purifier.dart';
+import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -226,7 +228,7 @@ class _BookSourceEditPageState extends ConsumerState<BookSourceEditPage>
           if (_error != null)
             Container(
               width: double.infinity,
-              color: Colors.red.shade50,
+              color: ThemeColors.errorContainer(context),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
@@ -312,7 +314,7 @@ class _BookSourceEditPageState extends ConsumerState<BookSourceEditPage>
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.blueGrey.shade50,
+            color: ThemeColors.infoContainer(context),
             borderRadius: BorderRadius.circular(8),
           ),
           child: const Column(
@@ -396,11 +398,8 @@ class _BookSourceEditPageState extends ConsumerState<BookSourceEditPage>
       children: [
         _TextField(label: '正文', controller: _rcContent, hint: 'class.content@html', maxLines: 3),
         _TextField(label: '下一页 URL', controller: _rcNextContentUrl, hint: '可选，长章节分页用'),
-        _TextField(
-            label: '净化规则',
-            controller: _rcReplaceRegex,
-            hint: '正则，多个用 ## 分隔',
-            maxLines: 2),
+        _PurifyRulesField(controller: _rcReplaceRegex),
+        const SizedBox(height: 12),
         _TextField(label: '图片样式', controller: _rcImageStyle, hint: '可选，如 full'),
       ],
     );
@@ -445,6 +444,251 @@ class _TextField extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 净化规则字段：多行编辑 + 实时校验 + 测试按钮。
+class _PurifyRulesField extends StatefulWidget {
+  final TextEditingController controller;
+  const _PurifyRulesField({required this.controller});
+
+  @override
+  State<_PurifyRulesField> createState() => _PurifyRulesFieldState();
+}
+
+class _PurifyRulesFieldState extends State<_PurifyRulesField> {
+  PurifyValidateResult? _result;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_revalidate);
+    _revalidate();
+  }
+
+  void _revalidate() {
+    final r = ContentPurifier.validate(widget.controller.text);
+    if (!mounted) return;
+    setState(() => _result = r);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = _result;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('净化规则',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              const SizedBox(width: 8),
+              if (r != null && r.ruleCount > 0)
+                _Badge(
+                  text: '${r.ruleCount} 条',
+                  color: r.isValid ? Colors.green : Colors.orange,
+                ),
+              const Spacer(),
+              TextButton.icon(
+                icon: const Icon(Icons.science_outlined, size: 16),
+                label: const Text('测试', style: TextStyle(fontSize: 12)),
+                onPressed: _openTestDialog,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          TextField(
+            controller: widget.controller,
+            minLines: 3,
+            maxLines: 8,
+            decoration: const InputDecoration(
+              isDense: true,
+              hintText: '一行一条规则，或用 || 分隔\n格式：regex 或 regex##replacement',
+              border: OutlineInputBorder(),
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            ),
+          ),
+          if (r != null && r.ruleCount > 0 && !r.isValid) ...[
+            const SizedBox(height: 6),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: ThemeColors.errorContainer(context),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: ThemeColors.errorBorder(context)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final e in r.errors.take(3))
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.error_outline,
+                            color: Colors.red, size: 14),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(e,
+                              style: TextStyle(
+                                  color: ThemeColors.errorText(context), fontSize: 11)),
+                        ),
+                      ],
+                    ),
+                  if (r.errors.length > 3)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 18, top: 2),
+                      child: Text('…还有 ${r.errors.length - 3} 条错误',
+                          style: TextStyle(
+                              color: ThemeColors.errorText(context), fontSize: 11)),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: ThemeColors.infoContainer(context),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('语法提示',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 11)),
+                SizedBox(height: 4),
+                Text(
+                  '• regex → 删除匹配内容\n'
+                  '• regex##replacement → 替换为 replacement\n'
+                  '• 多条规则用换行或 || 分隔\n'
+                  '• 捕获组引用：\$1、\${1}、\$<name>\n'
+                  '• 前缀 flag：(?i) 大小写不敏感、(?m) 多行、(?s) . 匹配换行',
+                  style: TextStyle(fontSize: 11, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openTestDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => _PurifyTestDialog(
+        rules: widget.controller.text,
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  final String text;
+  final Color color;
+  const _Badge({required this.text, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Text(text, style: TextStyle(color: color, fontSize: 11)),
+    );
+  }
+}
+
+/// 净化规则测试对话框：输入示例文本，实时显示净化后的结果。
+class _PurifyTestDialog extends StatefulWidget {
+  final String rules;
+  const _PurifyTestDialog({required this.rules});
+
+  @override
+  State<_PurifyTestDialog> createState() => _PurifyTestDialogState();
+}
+
+class _PurifyTestDialogState extends State<_PurifyTestDialog> {
+  final _inputCtrl = TextEditingController(
+    text: '请访问 m.example.com 看完整内容\n本章正文第一段。\n广告：xxx推广\n本章正文第二段。',
+  );
+
+  @override
+  void dispose() {
+    _inputCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final input = _inputCtrl.text;
+    final output = widget.rules.isEmpty
+        ? input
+        : ContentPurifier.purify(input, widget.rules);
+    return AlertDialog(
+      title: const Text('净化规则测试', style: TextStyle(fontSize: 16)),
+      contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('输入文本',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 4),
+            TextField(
+              controller: _inputCtrl,
+              maxLines: 5,
+              minLines: 3,
+              decoration: const InputDecoration(
+                isDense: true,
+                border: OutlineInputBorder(),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            const Text('净化后',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 4),
+            Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(maxHeight: 200),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: ThemeColors.successContainer(context),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: ThemeColors.successBorder(context)),
+              ),
+              child: SingleChildScrollView(
+                child: SelectableText(
+                  output,
+                  style: const TextStyle(
+                      fontSize: 12, height: 1.4, fontFamily: 'monospace'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('关闭'),
+        ),
+      ],
     );
   }
 }

@@ -110,4 +110,14 @@ class ReadingStatsRepository {
     final all = await getAll();
     return all.fold<int>(0, (sum, s) => sum + s.wordCount);
   }
+
+  /// 直接写入/覆盖单日统计（用于备份恢复）。
+  Future<void> upsertRaw(DailyReadingStat stat) async {
+    await _box.put(stat.date, jsonEncode(stat.toJson()));
+  }
+
+  /// 清空所有统计。
+  Future<void> clear() async {
+    await _box.clear();
+  }
 }

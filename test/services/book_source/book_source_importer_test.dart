@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:book_reader/data/models/book_source.dart';
 import 'package:book_reader/services/book_source/book_source_importer.dart';
 import 'package:book_reader/services/book_source/book_source_validator.dart';
 

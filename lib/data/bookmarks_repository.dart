@@ -79,4 +79,29 @@ class BookmarkRepository {
       await add(bookmark);
     }
   }
+
+  /// 删除某本书的所有书签。
+  Future<void> deleteByBook(String bookId) async {
+    final list = _box.values
+        .map((s) => Bookmark.fromJson(jsonDecode(s) as Map<String, dynamic>))
+        .where((b) => b.bookId == bookId)
+        .toList();
+    for (final b in list) {
+      await _box.delete(b.id);
+    }
+  }
+
+  /// 返回全部书签。
+  Future<List<Bookmark>> getAll() async {
+    final list = _box.values
+        .map((s) => Bookmark.fromJson(jsonDecode(s) as Map<String, dynamic>))
+        .toList();
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
+  }
+
+  /// 清空所有书签。
+  Future<void> clear() async {
+    await _box.clear();
+  }
 }

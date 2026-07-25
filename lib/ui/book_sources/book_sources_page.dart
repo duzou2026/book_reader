@@ -4,6 +4,7 @@ import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/models/book_source.dart';
 import 'package:book_reader/ui/book_sources/book_source_import_dialog.dart';
 import 'package:book_reader/ui/book_sources/book_source_test_sheet.dart';
+import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -228,15 +229,15 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                 ],
               ),
               const SizedBox(height: 4),
-              const Text('JSON 已复制到剪贴板，可粘贴到导入对话框或分享给他人。',
-                  style: TextStyle(color: Colors.grey, fontSize: 12)),
+              Text('JSON 已复制到剪贴板，可粘贴到导入对话框或分享给他人。',
+                  style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12)),
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,
                 constraints: const BoxConstraints(maxHeight: 220),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: ThemeColors.surfaceLevel1(context),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: SingleChildScrollView(
@@ -344,7 +345,7 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
     final repo = ref.read(bookSourceRepositoryProvider);
     for (final s in targets) {
       await repo.upsert(s.copyWith(
-        bookSourceGroup: newGroup!.isEmpty ? null : newGroup,
+        bookSourceGroup: newGroup.isEmpty ? null : newGroup,
       ));
     }
     if (!mounted) return;
@@ -482,11 +483,11 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                   children: [
                     Text('共 ${_lastList.length} 个源',
                         style: TextStyle(
-                            color: Colors.grey.shade700, fontSize: 13)),
+                            color: ThemeColors.mutedText(context), fontSize: 13)),
                     const SizedBox(width: 8),
                     Text('· 已启用 $enabledCount',
                         style: TextStyle(
-                            color: Colors.green.shade700, fontSize: 13)),
+                            color: ThemeColors.successText(context), fontSize: 13)),
                   ],
                 ),
               ),
@@ -543,7 +544,7 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                 child: list.isEmpty
                     ? Center(
                         child: Text('没有匹配「$_filter」的书源',
-                            style: TextStyle(color: Colors.grey.shade500)),
+                            style: TextStyle(color: ThemeColors.mutedText(context))),
                       )
                     : ListView.separated(
                         itemCount: list.length,
@@ -563,7 +564,7 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                                         : Icons.radio_button_unchecked,
                                     color: selected
                                         ? Theme.of(context).colorScheme.primary
-                                        : Colors.grey,
+                                        : ThemeColors.mutedText(context),
                                   )
                                 : null,
                             title: Text(s.bookSourceName),

@@ -1,6 +1,7 @@
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/bookshelf_repository.dart';
 import 'package:book_reader/data/models/search_result.dart';
+import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -286,6 +287,11 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
             tooltip: '阅读历史',
             onPressed: () => context.go('/reading-history'),
           ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: '设置',
+            onPressed: () => context.go('/settings'),
+          ),
           PopupMenuButton<BookshelfSort>(
             icon: const Icon(Icons.sort),
             tooltip: '排序',
@@ -345,13 +351,13 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.bookmark_border,
-                      size: 64, color: Colors.grey),
+                  Icon(Icons.bookmark_border,
+                      size: 64, color: ThemeColors.mutedText(context)),
                   const SizedBox(height: 12),
                   const Text('书架空空如也'),
                   const SizedBox(height: 6),
-                  const Text('搜索一本书，从详情页加入书架',
-                      style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text('搜索一本书，从详情页加入书架',
+                      style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12)),
                   const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: () => context.go('/search'),
@@ -377,7 +383,7 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
                 LinearProgressIndicator(
                   value: _checkDone / _checkTotal,
                   minHeight: 2,
-                  backgroundColor: Colors.grey.shade200,
+                  backgroundColor: ThemeColors.surfaceLevel2(context),
                 ),
               // 分组筛选条
               if (groups.isNotEmpty)
@@ -398,9 +404,9 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
                 ),
               Expanded(
                 child: list.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text('该分组下暂无书籍',
-                            style: TextStyle(color: Colors.grey)),
+                            style: TextStyle(color: ThemeColors.mutedText(context))),
                       )
                     : RefreshIndicator(
                         onRefresh: () async => setState(_reload),
@@ -496,8 +502,8 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
                 const SizedBox(width: 8),
                 Text(
                   _formatTime(e.lastReadAt),
-                  style: const TextStyle(
-                      color: Colors.grey, fontSize: 11),
+                  style: TextStyle(
+                      color: ThemeColors.mutedText(context), fontSize: 11),
                 ),
               ],
             ),
@@ -509,8 +515,8 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
                   children: [
                     Text(
                       e.author,
-                      style: const TextStyle(
-                          color: Colors.grey, fontSize: 12),
+                      style: TextStyle(
+                          color: ThemeColors.mutedText(context), fontSize: 12),
                     ),
                     if (e.group.isNotEmpty) ...[
                       const SizedBox(width: 8),
@@ -563,7 +569,7 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
                 ],
               ],
             ),
-            trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+            trailing: Icon(Icons.chevron_right, color: ThemeColors.mutedText(context)),
             onTap: () => _openBook(e),
             onLongPress: () => _showEntryMenu(e),
           ),
@@ -656,7 +662,7 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
                   '读到 ${e.lastChapterName}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  style: TextStyle(fontSize: 10, color: ThemeColors.mutedText(context)),
                 ),
             ],
           ),
@@ -717,8 +723,8 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
     return Container(
       width: w,
       height: h,
-      color: Colors.grey.shade200,
-      child: const Icon(Icons.book, color: Colors.grey, size: 24),
+      color: ThemeColors.surfaceLevel2(context),
+      child: Icon(Icons.book, color: ThemeColors.mutedText(context), size: 24),
     );
   }
 }

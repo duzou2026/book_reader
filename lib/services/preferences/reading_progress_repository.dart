@@ -102,7 +102,19 @@ class ReadingProgressRepository {
     await upsert(updated);
   }
 
+  /// 返回全部进度。
+  Future<List<ReadingProgress>> getAll() async {
+    return _box.values
+        .map((s) => ReadingProgress.fromJson(jsonDecode(s) as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<void> delete(String id) async {
     await _box.delete(id);
+  }
+
+  /// 清空所有进度。
+  Future<void> clear() async {
+    await _box.clear();
   }
 }

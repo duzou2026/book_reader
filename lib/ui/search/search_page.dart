@@ -3,6 +3,7 @@ import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/data/search_history_repository.dart';
 import 'package:book_reader/services/search/search_aggregator.dart';
 import 'package:book_reader/services/search/search_result_cache.dart';
+import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:book_reader/ui/search/search_result_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -270,7 +271,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 : results.isEmpty
                     ? Center(
                         child: Text('当前筛选下无结果',
-                            style: TextStyle(color: Colors.grey.shade500)),
+                            style: TextStyle(color: ThemeColors.mutedText(context))),
                       )
                     : ListView.builder(
                         itemCount: results.length,
@@ -298,7 +299,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: ThemeColors.surfaceLevel1(context),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(
@@ -337,7 +338,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 decoration: BoxDecoration(
                   color: _filterSourceUrl != null
                       ? Colors.teal.withOpacity(0.12)
-                      : Colors.grey.shade100,
+                      : ThemeColors.surfaceLevel1(context),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Row(
@@ -377,7 +378,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 decoration: BoxDecoration(
                   color: _filterKind != null
                       ? Colors.teal.withOpacity(0.12)
-                      : Colors.grey.shade100,
+                      : ThemeColors.surfaceLevel1(context),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Row(
@@ -449,14 +450,14 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           LinearProgressIndicator(
             value: ratio,
             minHeight: 4,
-            backgroundColor: Colors.grey.shade200,
+            backgroundColor: ThemeColors.surfaceLevel2(context),
           ),
           const SizedBox(height: 4),
           Text(
             p.total == 0
                 ? '无可用书源，请先导入'
                 : '搜索中 ${p.completed}/${p.total} 源已返回 · 已找到 ${p.resultCount} 条',
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12),
           ),
         ],
       ),
@@ -564,9 +565,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: ThemeColors.surfaceLevel1(context),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade300, width: 0.5),
+          border: Border.all(color: ThemeColors.outline(context), width: 0.5),
         ),
         child: Text(label, style: const TextStyle(fontSize: 13)),
       ),
@@ -598,7 +599,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               noSource
                   ? '导入书源后即可搜索全网小说'
                   : '换个关键词试试，或去书源管理添加更多源',
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12),
             ),
             const SizedBox(height: 16),
             FilledButton.tonalIcon(

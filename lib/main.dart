@@ -1,5 +1,6 @@
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/app/router.dart';
+import 'package:book_reader/services/preferences/theme_prefs_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
@@ -22,6 +23,7 @@ Future<void> main() async {
   final bookmarksBox = await Hive.openBox<String>('bookmarks');
   final readingStatsBox = await Hive.openBox<String>('reading_stats');
   final readingHistoryBox = await Hive.openBox<String>('reading_history');
+  final chapterCacheBox = await Hive.openBox<String>('chapter_cache');
   runApp(
     ProviderScope(
       overrides: [
@@ -34,24 +36,48 @@ Future<void> main() async {
         bookmarksBoxProvider.overrideWithValue(bookmarksBox),
         readingStatsBoxProvider.overrideWithValue(readingStatsBox),
         readingHistoryBoxProvider.overrideWithValue(readingHistoryBox),
+        chapterCacheBoxProvider.overrideWithValue(chapterCacheBox),
       ],
       child: const BookReaderApp(),
     ),
   );
 }
 
-class BookReaderApp extends StatelessWidget {
+class BookReaderApp extends ConsumerWidget {
   const BookReaderApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(themePrefsProvider);
+    final seed = Color(prefs.seedColor);
     return MaterialApp.router(
       title: 'Book Reader',
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        colorScheme: ColorScheme.fromSeed(seedColor: seed),
+        visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: seed,
+          brightness: Brightness.dark,
+        ),
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+      ),
+      themeMode: _toMaterialThemeMode(prefs.mode),
       routerConfig: appRouter,
     );
+  }
+
+  ThemeMode _toMaterialThemeMode(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.system:
+        return ThemeMode.system;
+      case AppThemeMode.light:
+        return ThemeMode.light;
+      case AppThemeMode.dark:
+        return ThemeMode.dark;
+    }
   }
 }

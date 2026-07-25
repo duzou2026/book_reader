@@ -11,6 +11,8 @@ import 'package:book_reader/domain/usecases/resolve_chapter_content.dart';
 import 'package:book_reader/services/preferences/reading_prefs_repository.dart';
 import 'package:book_reader/services/text/chinese_converter.dart';
 import 'package:book_reader/services/tts/tts_service.dart';
+import 'package:book_reader/ui/book/chapter_download_sheet.dart';
+import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -855,6 +857,18 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
             onPressed: _loading ? null : _manualResolve,
           ),
           IconButton(
+            icon: const Icon(Icons.download_for_offline),
+            tooltip: '离线下载',
+            onPressed: _loading
+                ? null
+                : () => ChapterDownloadSheet.show(
+                      context,
+                      book: _currentBook,
+                      chapters: _currentChapters,
+                      currentIndex: _currentIndex,
+                    ),
+          ),
+          IconButton(
             icon: const Icon(Icons.menu_book),
             tooltip: '笔记 / 书签',
             onPressed: _openNotesDrawer,
@@ -1310,14 +1324,14 @@ class _ChapterDrawerState extends State<_ChapterDrawer> {
                       Theme.of(context).colorScheme.primary.withOpacity(0.12),
                   leading: Text('${c.index}',
                       style: TextStyle(
-                        color: Colors.grey.shade500,
+                        color: ThemeColors.mutedText(context),
                         fontSize: 12,
                       )),
                   title: Text(
                     c.name,
                     style: TextStyle(
                       fontSize: 14,
-                      color: c.isVolume ? Colors.grey.shade500 : null,
+                      color: c.isVolume ? ThemeColors.mutedText(context) : null,
                       fontWeight: isCurrent
                           ? FontWeight.bold
                           : (c.isVolume
@@ -1544,7 +1558,7 @@ class _SettingsSheet extends ConsumerWidget {
                           border: Border.all(
                             color: prefs.backgroundIndex == i
                                 ? Theme.of(context).colorScheme.primary
-                                : Colors.grey,
+                                : ThemeColors.mutedText(context),
                             width: prefs.backgroundIndex == i ? 3 : 1,
                           ),
                         ),
@@ -1708,12 +1722,12 @@ class _NotesBookmarksSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.edit_note, size: 56, color: Colors.grey.shade400),
+            Icon(Icons.edit_note, size: 56, color: ThemeColors.mutedText(context)),
             const SizedBox(height: 8),
             const Text('还没有笔记'),
             const SizedBox(height: 4),
-            const Text('在正文中长按选择文字即可添加笔记',
-                style: TextStyle(color: Colors.grey, fontSize: 12)),
+            Text('在正文中长按选择文字即可添加笔记',
+                style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12)),
           ],
         ),
       );
@@ -1731,7 +1745,7 @@ class _NotesBookmarksSheet extends StatelessWidget {
             size: 18,
             color: isCurrent
                 ? Theme.of(context).colorScheme.primary
-                : Colors.grey,
+                : ThemeColors.mutedText(context),
           ),
           title: Text(
             n.text,
@@ -1759,7 +1773,7 @@ class _NotesBookmarksSheet extends StatelessWidget {
                 '${n.chapterName} · 第 ${n.chapterIndex + 1} 章',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.grey.shade600,
+                  color: ThemeColors.mutedText(context),
                 ),
               ),
             ],
@@ -1799,12 +1813,12 @@ class _NotesBookmarksSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.bookmark_border, size: 56, color: Colors.grey.shade400),
+            Icon(Icons.bookmark_border, size: 56, color: ThemeColors.mutedText(context)),
             const SizedBox(height: 8),
             const Text('还没有书签'),
             const SizedBox(height: 4),
-            const Text('点击右上角书签图标可加入书签',
-                style: TextStyle(color: Colors.grey, fontSize: 12)),
+            Text('点击右上角书签图标可加入书签',
+                style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12)),
           ],
         ),
       );
@@ -1836,7 +1850,7 @@ class _NotesBookmarksSheet extends StatelessWidget {
               : null,
           trailing: Text(
             '第 ${b.chapterIndex + 1} 章',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 11, color: ThemeColors.mutedText(context)),
           ),
           onTap: isCurrent ? null : () => onJumpBookmark(b.chapterIndex),
         );
@@ -1878,8 +1892,8 @@ class _AddNoteDialogState extends State<_AddNoteDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('划线内容',
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
+            Text('划线内容',
+                style: TextStyle(fontSize: 12, color: ThemeColors.mutedText(context))),
             const SizedBox(height: 4),
             Container(
               padding: const EdgeInsets.all(8),
@@ -1896,8 +1910,8 @@ class _AddNoteDialogState extends State<_AddNoteDialog> {
               ),
             ),
             const SizedBox(height: 12),
-            const Text('感想（可选）',
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
+            Text('感想（可选）',
+                style: TextStyle(fontSize: 12, color: ThemeColors.mutedText(context))),
             const SizedBox(height: 4),
             TextField(
               controller: _controller,
