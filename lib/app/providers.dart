@@ -1,5 +1,8 @@
 import 'package:book_reader/data/hive_book_source_repository.dart';
+import 'package:book_reader/domain/usecases/get_book_info.dart';
 import 'package:book_reader/domain/usecases/search_books.dart';
+import 'package:book_reader/services/book_info/book_info_fetcher.dart';
+import 'package:book_reader/services/book_info/toc_fetcher.dart';
 import 'package:book_reader/services/http/book_source_fetcher.dart';
 import 'package:book_reader/services/http/dio_book_source_fetcher.dart';
 import 'package:book_reader/services/rule_engine/rule_engine.dart';
@@ -41,5 +44,35 @@ final searchBooksProvider = Provider<SearchBooks>((ref) {
   return SearchBooks(
     aggregator: ref.watch(searchAggregatorProvider),
     repository: ref.watch(bookSourceRepositoryProvider),
+  );
+});
+
+final bookInfoFetcherProvider = Provider<BookInfoFetcher>((ref) {
+  return BookInfoFetcher(
+    fetcher: ref.watch(fetcherProvider),
+    ruleEngine: ref.watch(ruleEngineProvider),
+  );
+});
+
+final tocFetcherProvider = Provider<TocFetcher>((ref) {
+  return TocFetcher(
+    fetcher: ref.watch(fetcherProvider),
+    ruleEngine: ref.watch(ruleEngineProvider),
+  );
+});
+
+final getBookInfoProvider = Provider<GetBookInfo>((ref) {
+  return GetBookInfo(
+    fetcher: ref.watch(bookInfoFetcherProvider),
+    getEnabledSources: () =>
+        ref.watch(bookSourceRepositoryProvider).getEnabledSources(),
+  );
+});
+
+final getTocProvider = Provider<GetToc>((ref) {
+  return GetToc(
+    fetcher: ref.watch(tocFetcherProvider),
+    getEnabledSources: () =>
+        ref.watch(bookSourceRepositoryProvider).getEnabledSources(),
   );
 });
