@@ -28,7 +28,7 @@ void main() {
 
     test('strips known prefixes before checking', () {
       expect(LegadoRuleParser.isLegadoRule('@css:.foo'), isFalse);
-      expect(LegadoRuleParser.isLegadoRule('json:$.data'), isFalse);
+      expect(LegadoRuleParser.isLegadoRule(r'json:$.data'), isFalse);
     });
 
     test('JSONPath not legado', () {
