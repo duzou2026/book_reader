@@ -73,7 +73,11 @@ extension AppUpdateInfoX on AppUpdateInfo {
   }
 
   /// 格式化版本大小（MB）。
+  ///
+  /// Gitee Releases API 不返回 asset 的 size 字段（恒为 0），
+  /// 此时返回 "未知大小" 而非误导性的 "0.0 MB"。
   String sizeLabelFor(ReleaseAsset asset) {
+    if (asset.size <= 0) return '未知大小';
     final mb = asset.size / (1024 * 1024);
     return '${mb.toStringAsFixed(1)} MB';
   }

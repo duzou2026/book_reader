@@ -125,8 +125,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # 同步创建 Gitee Release 并上传 APK（国内用户走 Gitee 更新）
+      # 注意：GitHub Actions runner（美国/欧洲）到 Gitee（国内）的网络不稳定，
+      # 大文件上传经常超时。设 continue-on-error 让构建不因此失败；
+      # 上传失败时需手动从 GitHub Release 下载 APK 再上传到 Gitee。
       - name: Create Gitee Release & upload APKs (on tag)
         if: startsWith(github.ref, 'refs/tags/v')
+        continue-on-error: true
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
           GITEE_OWNER: duzou_5aidnf
@@ -153,11 +157,12 @@ jobs:
           cd build/app/outputs/flutter-apk/
           for f in book_reader-*.apk; do
             echo "上传 $f ..."
-            # --max-time 300 防止网络慢时无限挂起；--retry 失败自动重试 2 次
-            UPLOAD_RESP=$(curl -sS --max-time 300 --retry 2 --retry-delay 5 -X POST \
+            # --max-time 60：GitHub runner 到 Gitee 网络不稳定，单次最多等 60s
+            # --retry 1：最多重试 1 次（3 个 APK × 2 次 × 60s = 360s，远低于 job 超时）
+            UPLOAD_RESP=$(curl -sS --max-time 60 --retry 1 --retry-delay 5 -X POST \
               "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/${RELEASE_ID}/attach_files" \
               -F "access_token=${GITEE_TOKEN}" \
-              -F "file=@${f}" 2>&1) || { echo "  ✗ 上传 $f 失败: $UPLOAD_RESP"; continue; }
+              -F "file=@${f}" 2>&1) || { echo "  ✗ 上传 $f 失败（可手动补传）: $UPLOAD_RESP"; continue; }
             echo "$UPLOAD_RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'  ✓ {d.get(\"name\",\"?\")} -> {d.get(\"browser_download_url\",\"?\")}')" 2>/dev/null || echo "  ⚠ $f 上传响应解析失败: $UPLOAD_RESP"
           done
-          echo "✓ Gitee release 资产上传完成"
+          echo "✓ Gitee release 资产上传完成（失败项需手动补传）"

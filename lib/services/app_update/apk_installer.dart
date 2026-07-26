@@ -37,7 +37,9 @@ class ApkInstaller {
     await file.parent.create(recursive: true);
 
     // 已存在同名文件且大小一致 → 直接复用
-    if (file.existsSync() && file.lengthSync() == asset.size) {
+    // Gitee API 不返回 size（恒为 0），此时只要文件存在且非空就复用
+    if (file.existsSync() &&
+        (asset.size <= 0 ? file.lengthSync() > 0 : file.lengthSync() == asset.size)) {
       return file;
     }
 
