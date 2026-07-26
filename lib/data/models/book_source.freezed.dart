@@ -31,6 +31,7 @@ mixin _$BookSource {
   RuleBookInfo? get ruleBookInfo => throw _privateConstructorUsedError;
   RuleToc? get ruleToc => throw _privateConstructorUsedError;
   RuleContent? get ruleContent => throw _privateConstructorUsedError;
+  String? get header => throw _privateConstructorUsedError;
   int get priority => throw _privateConstructorUsedError;
   int get weight => throw _privateConstructorUsedError;
   Object? get lastUpdateTime => throw _privateConstructorUsedError;
@@ -65,6 +66,7 @@ abstract class $BookSourceCopyWith<$Res> {
       RuleBookInfo? ruleBookInfo,
       RuleToc? ruleToc,
       RuleContent? ruleContent,
+      String? header,
       int priority,
       int weight,
       Object? lastUpdateTime,
@@ -154,6 +156,10 @@ class _$BookSourceCopyWithImpl<$Res, $Val extends BookSource>
           ? _value.ruleContent
           : ruleContent // ignore: cast_nullable_to_non_nullable
               as RuleContent?,
+      header: freezed == header
+          ? _value.header
+          : header // ignore: cast_nullable_to_non_nullable
+              as String?,
       priority: null == priority
           ? _value.priority
           : priority // ignore: cast_nullable_to_non_nullable
@@ -254,6 +260,7 @@ abstract class _$$BookSourceImplCopyWith<$Res>
       RuleBookInfo? ruleBookInfo,
       RuleToc? ruleToc,
       RuleContent? ruleContent,
+      String? header,
       int priority,
       int weight,
       Object? lastUpdateTime,
@@ -345,6 +352,10 @@ class __$$BookSourceImplCopyWithImpl<$Res>
           ? _value.ruleContent
           : ruleContent // ignore: cast_nullable_to_non_nullable
               as RuleContent?,
+      header: freezed == header
+          ? _value.header
+          : header // ignore: cast_nullable_to_non_nullable
+              as String?,
       priority: null == priority
           ? _value.priority
           : priority // ignore: cast_nullable_to_non_nullable
@@ -384,6 +395,7 @@ class _$BookSourceImpl implements _BookSource {
       this.ruleBookInfo,
       this.ruleToc,
       this.ruleContent,
+      this.header,
       this.priority = 0,
       this.weight = 0,
       this.lastUpdateTime,
@@ -417,6 +429,7 @@ class _$BookSourceImpl implements _BookSource {
   final RuleToc? ruleToc;
   @override
   final RuleContent? ruleContent;
+  final String? header;
   @override
   @JsonKey()
   final int priority;
@@ -432,7 +445,7 @@ class _$BookSourceImpl implements _BookSource {
 
   @override
   String toString() {
-    return 'BookSource(bookSourceName: $bookSourceName, bookSourceUrl: $bookSourceUrl, bookSourceType: $bookSourceType, enabled: $enabled, bookSourceGroup: $bookSourceGroup, searchUrl: $searchUrl, loginUrl: $loginUrl, ruleSearch: $ruleSearch, ruleBookInfo: $ruleBookInfo, ruleToc: $ruleToc, ruleContent: $ruleContent, priority: $priority, weight: $weight, lastUpdateTime: $lastUpdateTime, respondTime: $respondTime, weightValue: $weightValue)';
+    return 'BookSource(bookSourceName: $bookSourceName, bookSourceUrl: $bookSourceUrl, bookSourceType: $bookSourceType, enabled: $enabled, bookSourceGroup: $bookSourceGroup, searchUrl: $searchUrl, loginUrl: $loginUrl, ruleSearch: $ruleSearch, ruleBookInfo: $ruleBookInfo, ruleToc: $ruleToc, ruleContent: $ruleContent, header: $header, priority: $priority, weight: $weight, lastUpdateTime: $lastUpdateTime, respondTime: $respondTime, weightValue: $weightValue)';
   }
 
   @override
@@ -460,6 +473,8 @@ class _$BookSourceImpl implements _BookSource {
             (identical(other.ruleToc, ruleToc) || other.ruleToc == ruleToc) &&
             (identical(other.ruleContent, ruleContent) ||
                 other.ruleContent == ruleContent) &&
+            (identical(other.header, header) ||
+                other.header == header) &&
             (identical(other.priority, priority) ||
                 other.priority == priority) &&
             (identical(other.weight, weight) || other.weight == weight) &&
@@ -486,6 +501,7 @@ class _$BookSourceImpl implements _BookSource {
       ruleBookInfo,
       ruleToc,
       ruleContent,
+      header,
       priority,
       weight,
       lastUpdateTime,
@@ -521,6 +537,7 @@ abstract class _BookSource implements BookSource {
       final RuleBookInfo? ruleBookInfo,
       final RuleToc? ruleToc,
       final RuleContent? ruleContent,
+      final String? header,
       final int priority,
       final int weight,
       final Object? lastUpdateTime,

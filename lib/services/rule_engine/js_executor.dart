@@ -9,7 +9,8 @@ import 'package:flutter_js/flutter_js.dart';
 /// 同时提供 `baseUrl`、`book`、`java`（部分兼容桩）等上下文变量。
 ///
 /// 注意：JS 执行是同步的。flutter_js 在 Android/iOS 上各自内嵌了 QuickJS /
-/// JavaScriptCore，性能足够规则解析使用。
+/// JavaScriptCore，性能足够规则解析使用。因此 `java.ajax/get/post` 等异步
+/// 网络方法无法真正实现（返回空字符串），用这些方法的 JS 规则会失效。
 class JsExecutor {
   static JavascriptRuntime? _runtime;
 
@@ -36,11 +37,10 @@ class JsExecutor {
     } else {
       setup.writeln('var book = {};');
     }
-    // 简易 java 兼容桩（legado 规则里常用，比如 java.encode()）
-    setup.writeln('var java = {'
-        'encode: (s) => encodeURIComponent(s),'
-        'log: (s) => s'
-        '};');
+    // java 兼容桩：覆盖 legado 书源常用的 java.xxx 调用。
+    // 网络相关方法（ajax/get/post/getCookie）因 JS 同步执行无法真正实现，
+    // 返回空字符串/空数组；编码/时间格式化等纯函数可正常工作。
+    setup.writeln(_javaStub);
 
     _rt.evaluate(setup.toString());
     final res = _rt.evaluate(expr);
@@ -52,6 +52,77 @@ class JsExecutor {
     }
     return raw;
   }
+
+  /// java 兼容桩 JS 代码。
+  ///
+  /// 实现 legado 书源常用的 java.xxx 方法：
+  ///   - 编码：encode / encodeURI / encodeURI / base64Encode / base64Decode
+  ///   - 时间：timeFormat / timeFormatUTC
+  ///   - 网络（桩，返回空）：ajax / get / post / getString / getCookie / put
+  ///   - UI（桩，无操作）：toast / longToast / log
+  ///   - 其他（桩）：androidId / hexDecodeToString / t2s / getVerificationCode /
+  ///     startBrowserAwait / setContent / getElement / get
+  static const String _javaStub = r'''
+var java = {
+  // 编码
+  encode: (s) => encodeURIComponent(s),
+  encodeURI: (s) => encodeURI(s),
+  encodeURIComponent: (s) => encodeURIComponent(s),
+  base64Encode: (s) => {
+    try { return btoa(unescape(encodeURIComponent(s))); } catch(e) { return ''; }
+  },
+  base64Decode: (s) => {
+    try { return decodeURIComponent(escape(atob(s))); } catch(e) { return ''; }
+  },
+  hexDecodeToString: (s) => {
+    try {
+      let r = '';
+      for (let i = 0; i < s.length; i += 2) {
+        r += String.fromCharCode(parseInt(s.substr(i, 2), 16));
+      }
+      return r;
+    } catch(e) { return ''; }
+  },
+  // 时间格式化
+  timeFormat: (ts) => {
+    try {
+      let d = new Date(typeof ts === 'number' ? ts : parseInt(ts));
+      if (isNaN(d.getTime())) return '';
+      let pad = (n) => n < 10 ? '0' + n : '' + n;
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+        ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    } catch(e) { return ''; }
+  },
+  timeFormatUTC: (ts) => {
+    try {
+      let d = new Date(typeof ts === 'number' ? ts : parseInt(ts));
+      if (isNaN(d.getTime())) return '';
+      let pad = (n) => n < 10 ? '0' + n : '' + n;
+      return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()) +
+        ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes());
+    } catch(e) { return ''; }
+  },
+  // 网络相关（同步环境无法真正实现，返回空）
+  ajax: (url) => '',
+  get: (url) => '',
+  post: (url, body) => '',
+  getString: (url) => '',
+  getCookie: (key) => '',
+  put: (key, val) => {},
+  // UI（桩，无操作）
+  log: (s) => s,
+  toast: (s) => s,
+  longToast: (s) => s,
+  // 其他桩
+  androidId: '',
+  getVerificationCode: (url) => '',
+  startBrowserAwait: (url, selector) => '',
+  setContent: (s) => {},
+  getElement: (rule) => [],
+  // cookie 操作桩
+  removeCookie: (url) => {}
+};
+''';
 
   String _stripRule(String rule) {
     var p = rule.trim();

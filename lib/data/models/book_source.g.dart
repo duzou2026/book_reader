@@ -29,6 +29,7 @@ _$BookSourceImpl _$$BookSourceImplFromJson(Map<String, dynamic> json) =>
       ruleContent: json['ruleContent'] == null
           ? null
           : RuleContent.fromJson(json['ruleContent'] as Map<String, dynamic>),
+      header: json['header'] as String?,
       priority: (json['priority'] as num?)?.toInt() ?? 0,
       weight: (json['weight'] as num?)?.toInt() ?? 0,
       lastUpdateTime: _asObject(json['lastUpdateTime']),
@@ -49,6 +50,7 @@ Map<String, dynamic> _$$BookSourceImplToJson(_$BookSourceImpl instance) =>
       'ruleBookInfo': instance.ruleBookInfo,
       'ruleToc': instance.ruleToc,
       'ruleContent': instance.ruleContent,
+      'header': instance.header,
       'priority': instance.priority,
       'weight': instance.weight,
       'lastUpdateTime': instance.lastUpdateTime,

@@ -31,6 +31,9 @@ class BookSource with _$BookSource {
     RuleBookInfo? ruleBookInfo,
     RuleToc? ruleToc,
     RuleContent? ruleContent,
+    /// 书源级自定义 header（JSON 字符串或 @js: 规则）。
+    /// 用于绕过站点 UA 检查、设置 Referer / Cookie 等。
+    String? header,
     @Default(0) int priority,
     @Default(0) int weight,
     /// legado 书源里这两个字段有时是 int（毫秒时间戳），有时是 String。

@@ -1,3 +1,5 @@
+import 'legado_rule_parser.dart';
+
 /// 规则类型识别器。
 ///
 /// legado 书源规则支持多种前缀语法来指定解析方式：
@@ -6,10 +8,11 @@
 ///   - `@xpath:` / `xpath:` → XPath
 ///   - `@regex:` / `regex:` → 正则表达式
 ///   - `@js:` / `js:` / `<js>...</js>` → JavaScript
+///   - 无前缀但以 `class.` / `tag.` / `id.` 开头 → legado 旧式语法
+///   - 无前缀但以 `//` 开头 → XPath
 ///
-/// 没有前缀时，根据内容形态自动判定：以 `$` 开头视为 JSONPath，
-/// 否则按纯文本字面量返回。
-enum RuleType { css, json, xpath, regex, js, plain }
+/// 没有前缀时，根据内容形态自动判定。
+enum RuleType { css, json, xpath, regex, js, plain, legado }
 
 class RuleParser {
   RuleType detect(String rule) {
@@ -38,6 +41,14 @@ class RuleParser {
     // 以 $ 开头（如 $.data.name 或 $..name）视为 JSONPath
     if (trimmed.startsWith(r'$')) {
       return RuleType.json;
+    }
+    // 以 // 开头（如 //meta[@property='og:novel:author']/@content）视为 XPath
+    if (trimmed.startsWith('//') || trimmed.startsWith('/')) {
+      return RuleType.xpath;
+    }
+    // legado 旧式语法：以 class. / tag. / id. / children. 开头
+    if (LegadoRuleParser.isLegadoRule(trimmed)) {
+      return RuleType.legado;
     }
     // 形如 ".foo > .bar" 或 ".foo@text" 视为 CSS
     if (_looksLikeCss(trimmed)) {
