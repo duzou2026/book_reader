@@ -1,13 +1,13 @@
 import 'package:book_reader/services/app_update/app_update_info.dart';
 import 'package:dio/dio.dart';
 
-/// GitHub Release 信息检查器。
+/// Gitee Release 信息检查器。
 ///
-/// 通过 GitHub Releases API 拉取最新 release，解析为 [AppUpdateInfo]。
+/// 通过 Gitee Releases API 拉取最新 release，解析为 [AppUpdateInfo]。
 ///
-/// API 文档：https://docs.github.com/rest/releases/releases#get-the-latest-release
+/// API 文档：https://gitee.com/api/v5/swagger#/getV5ReposOwnerRepoReleasesLatest
 ///
-/// 不带 token 时每 IP 每小时 60 次限额，对应用更新检查足够。
+/// 公开仓库无需 token，国内访问稳定。
 class AppUpdateChecker {
   AppUpdateChecker({
     required this.owner,
@@ -19,28 +19,24 @@ class AppUpdateChecker {
   final String repo;
   final Dio _dio;
 
-  /// 拉取最新 release（不包括 prerelease / draft）。
+  /// 拉取最新 release。
   ///
   /// 抛出：
   ///   - [DioException] 网络错误 / 404
   ///   - [FormatException] JSON 结构异常
   Future<AppUpdateInfo> fetchLatestRelease() async {
-    final url = 'https://api.github.com/repos/$owner/$repo/releases/latest';
+    final url =
+        'https://gitee.com/api/v5/repos/$owner/$repo/releases/latest';
     final response = await _dio.get<dynamic>(
       url,
       options: Options(
-        headers: {
-          'Accept': 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
         responseType: ResponseType.json,
-        // GitHub API 偶尔会慢，给 10s 超时
-        receiveTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 15),
       ),
     );
     final data = response.data;
     if (data is! Map) {
-      throw FormatException('GitHub API 返回非对象：${data.runtimeType}');
+      throw FormatException('Gitee API 返回非对象：${data.runtimeType}');
     }
     return _parseRelease(data.cast<String, dynamic>());
   }
@@ -59,11 +55,12 @@ class AppUpdateChecker {
         final name = (am['name'] as String?) ?? '';
         final url = (am['browser_download_url'] as String?) ?? '';
         if (name.isEmpty || url.isEmpty) continue;
-        // 只关心 APK
+        // 只关心 APK（Gitee 会自动附加 zip/tar.gz 源码包，需过滤）
         if (!name.toLowerCase().endsWith('.apk')) continue;
         assets.add(ReleaseAsset(
           name: name,
           browserDownloadUrl: url,
+          // Gitee API 不返回 size / content_type，用 0 / 空串占位
           size: (am['size'] as num?)?.toInt() ?? 0,
           contentType: (am['content_type'] as String?) ?? '',
         ));
@@ -74,7 +71,8 @@ class AppUpdateChecker {
       version: _stripLeadingV(tagName),
       name: (json['name'] as String?) ?? '',
       body: (json['body'] as String?) ?? '',
-      publishedAt: (json['published_at'] as String?) ?? '',
+      // Gitee 用 created_at（GitHub 用 published_at）
+      publishedAt: (json['created_at'] as String?) ?? '',
       htmlUrl: (json['html_url'] as String?) ?? '',
       assets: assets,
     );

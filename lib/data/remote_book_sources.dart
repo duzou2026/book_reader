@@ -21,15 +21,15 @@ class RemoteBookSources {
     Dio? dio,
   }) : _dio = dio ?? Dio();
 
-  /// 远程书源 JSON 地址。
+  /// 远程书源 JSON 地址（Gitee 仓库 raw URL）。
   ///
-  /// 用 jsDelivr CDN 而非 raw.githubusercontent.com：
-  ///   - jsDelivr 在国内有节点，访问稳定快速（4s 内可拉完 200KB）
-  ///   - raw.githubusercontent.com 在中国大陆经常超时
-  ///   - jsDelivr 缓存约 12h，新增书源后用户可点「刷新书源」触发强制拉取
-  ///     （fetch 内部已通过 Hive 缓存控制刷新频率）
+  /// 用 Gitee 而非 GitHub：
+  ///   - Gitee 国内访问稳定快速（0.5s 内拉完 200KB）
+  ///   - GitHub raw / jsDelivr 在国内可能超时
+  ///   - 公开仓库 raw URL 无需鉴权，App 直连即可
+  ///   - 新增书源后用户点「刷新书源」可立即拉到最新（无 CDN 缓存延迟）
   static const String remoteUrl =
-      'https://cdn.jsdelivr.net/gh/duzou2026/book_reader@main/book_sources/xiu2_sources.json';
+      'https://gitee.com/duzou_5aidnf/novel-reader/raw/master/book_sources/xiu2_sources.json';
 
   /// Hive 中缓存书源 JSON 字符串的 box。
   ///

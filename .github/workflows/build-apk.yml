@@ -123,3 +123,37 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 同步创建 Gitee Release 并上传 APK（国内用户走 Gitee 更新）
+      - name: Create Gitee Release & upload APKs (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITEE_OWNER: duzou_5aidnf
+          GITEE_REPO: novel-reader
+        run: |
+          TAG="${GITHUB_REF##refs/tags/}"
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d '+' -f 1)
+          echo "为 Gitee 创建 release: $TAG"
+          # 1. 创建 release
+          RESP=$(curl -sS -X POST \
+            "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases" \
+            -H "Content-Type: application/json;charset=UTF-8" \
+            -d "{\"access_token\":\"${GITEE_TOKEN}\",\"tag_name\":\"${TAG}\",\"name\":\"${TAG}\",\"body\":\"搜书看书 ${VERSION}\",\"target_commitish\":\"master\",\"prerelease\":false}")
+          RELEASE_ID=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+          if [ -z "$RELEASE_ID" ]; then
+            echo "✗ Gitee release 创建失败: $RESP"
+            exit 1
+          fi
+          echo "✓ Gitee release 已创建, id=$RELEASE_ID"
+          # 2. 逐个上传 APK
+          cd build/app/outputs/flutter-apk/
+          for f in book_reader-*.apk; do
+            echo "上传 $f ..."
+            curl -sS -X POST \
+              "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/${RELEASE_ID}/attach_files" \
+              -H "Content-Type: multipart/form-data" \
+              -F "access_token=${GITEE_TOKEN}" \
+              -F "file=@${f}" | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'  ✓ {d.get(\"name\",\"?\")} -> {d.get(\"browser_download_url\",\"?\")}')" 2>/dev/null || echo "  ✗ 上传 $f 失败"
+          done
+          echo "✓ Gitee release 资产上传完成"
