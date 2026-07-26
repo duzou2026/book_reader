@@ -147,13 +147,17 @@ jobs:
           fi
           echo "✓ Gitee release 已创建, id=$RELEASE_ID"
           # 2. 逐个上传 APK
+          # 注意：不要手动设置 -H "Content-Type: multipart/form-data"
+          # curl -F 会自动生成带 boundary 的 Content-Type；手动覆盖会丢掉 boundary，
+          # 导致 Gitee 服务端无法解析 multipart body，上传请求挂起直至超时。
           cd build/app/outputs/flutter-apk/
           for f in book_reader-*.apk; do
             echo "上传 $f ..."
-            curl -sS -X POST \
+            # --max-time 300 防止网络慢时无限挂起；--retry 失败自动重试 2 次
+            UPLOAD_RESP=$(curl -sS --max-time 300 --retry 2 --retry-delay 5 -X POST \
               "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/${RELEASE_ID}/attach_files" \
-              -H "Content-Type: multipart/form-data" \
               -F "access_token=${GITEE_TOKEN}" \
-              -F "file=@${f}" | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'  ✓ {d.get(\"name\",\"?\")} -> {d.get(\"browser_download_url\",\"?\")}')" 2>/dev/null || echo "  ✗ 上传 $f 失败"
+              -F "file=@${f}" 2>&1) || { echo "  ✗ 上传 $f 失败: $UPLOAD_RESP"; continue; }
+            echo "$UPLOAD_RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'  ✓ {d.get(\"name\",\"?\")} -> {d.get(\"browser_download_url\",\"?\")}')" 2>/dev/null || echo "  ⚠ $f 上传响应解析失败: $UPLOAD_RESP"
           done
           echo "✓ Gitee release 资产上传完成"
