@@ -31,12 +31,17 @@ class RemoteBookSources {
   static const String remoteUrl =
       'https://gitee.com/duzou_5aidnf/novel-reader/raw/master/book_sources/xiu2_sources.json';
 
-  /// Hive 中缓存书源 JSON 字符串的 box。
+  /// Hive 中缓存书源 JSON 字符串的 box（**必须是独立 box**）。
   ///
-  /// Key 固定为 `xiu2_sources`，value 为完整的 JSON 字符串。
+  /// Key 固定为 `xiu2_sources`，value 为完整的 List JSON 字符串。
   /// 用 JSON 而非逐条存储是为了：
   ///   - 缓存与远程一一对应，刷新逻辑简单
-  ///   - 单 key 读写，避免污染用户自己的 book_sources box
+  ///   - 单 key 读写，避免污染用户的书源 box
+  ///
+  /// **不能**和 [HiveBookSourceRepository] 的 box 共用：
+  /// 这里存的是 List JSON，而 repository 期望每个 value 是单个书源（Map），
+  /// 混用会导致 repository 的 `getAll()` 遍历到 List 时
+  /// `as Map<String, dynamic>` 崩溃。
   final dynamic /* Box<String> */ cacheBox;
 
   final Dio _dio;

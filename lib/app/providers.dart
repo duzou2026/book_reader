@@ -44,6 +44,17 @@ final bookSourceBoxProvider = Provider<Box<String>>((ref) {
   throw UnimplementedError('bookSourceBoxProvider 必须在 main.dart 中 override');
 });
 
+/// 远程书源缓存 Box（独立于 [bookSourceBoxProvider]）。
+///
+/// **必须独立**：[RemoteBookSources] 把整个远程 JSON（List 数组）写入缓存，
+/// 而 [HiveBookSourceRepository] 期望 [bookSourceBoxProvider] 的每个 value
+/// 是单个书源（Map 对象）。混用会导致 `getAll()` 遍历到 List JSON 时
+/// `as Map<String, dynamic>` 崩溃（type 'List' is not a subtype of type 'Map'）。
+final bookSourcesCacheBoxProvider = Provider<Box<String>>((ref) {
+  throw UnimplementedError(
+      'bookSourcesCacheBoxProvider 必须在 main.dart 中 override');
+});
+
 /// 书架 Box。
 final bookshelfBoxProvider = Provider<Box<String>>((ref) {
   throw UnimplementedError('bookshelfBoxProvider 必须在 main.dart 中 override');
@@ -104,10 +115,10 @@ final bookSourceRepositoryProvider = Provider<BookSourceRepository>((ref) {
 
 /// 远程书源获取器（从 GitHub 仓库拉取 + Hive 缓存）。
 ///
-/// 用 bookSourceBox 作为缓存容器（key=`xiu2_sources`），
-/// 避免再开一个 Box 增加复杂度。
+/// 缓存写入独立的 [bookSourcesCacheBoxProvider]，**不能**用 [bookSourceBoxProvider]，
+/// 否则 List JSON 会污染书源存储导致 `getAll()` 崩溃。
 final remoteBookSourcesProvider = Provider<RemoteBookSources>((ref) {
-  final box = ref.watch(bookSourceBoxProvider);
+  final box = ref.watch(bookSourcesCacheBoxProvider);
   return RemoteBookSources(cacheBox: box);
 });
 

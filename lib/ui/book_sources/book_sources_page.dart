@@ -130,7 +130,7 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             SizedBox(width: 12),
-            Text('正在从 GitHub 拉取书源...'),
+            Text('正在从 Gitee 拉取书源...'),
           ],
         ),
         duration: Duration(seconds: 30),
@@ -545,7 +545,7 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                 IconButton(
                   icon: const Icon(Icons.cloud_download_outlined),
                   onPressed: _refreshRemoteSources,
-                  tooltip: '从 GitHub 刷新书源',
+                  tooltip: '从 Gitee 刷新书源',
                 ),
                 IconButton(
                   icon: const Icon(Icons.recommend_outlined),

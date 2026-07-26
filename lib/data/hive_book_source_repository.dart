@@ -15,7 +15,8 @@ class HiveBookSourceRepository implements BookSourceRepository {
   @override
   Future<List<BookSource>> getEnabledSources() async {
     return _box.values
-        .map((s) => BookSource.fromJson(jsonDecode(s) as Map<String, dynamic>))
+        .map(_decodeSafe)
+        .whereType<BookSource>()
         .where((s) => s.enabled)
         .toList();
   }
@@ -33,16 +34,15 @@ class HiveBookSourceRepository implements BookSourceRepository {
   /// 返回全部书源（含禁用），供管理页使用。
   @override
   Future<List<BookSource>> getAll() async {
-    return _box.values
-        .map((s) => BookSource.fromJson(jsonDecode(s) as Map<String, dynamic>))
-        .toList();
+    return _box.values.map(_decodeSafe).whereType<BookSource>().toList();
   }
 
   @override
   Future<void> setEnabled(String bookSourceUrl, bool enabled) async {
     final raw = _box.get(bookSourceUrl);
     if (raw == null) return;
-    final source = BookSource.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    final source = _decodeSafe(raw);
+    if (source == null) return;
     await _box.put(bookSourceUrl, jsonEncode(source.copyWith(enabled: enabled).toJson()));
   }
 
@@ -54,5 +54,20 @@ class HiveBookSourceRepository implements BookSourceRepository {
   @override
   Future<void> clear() async {
     await _box.clear();
+  }
+
+  /// 安全解码单条书源 JSON。
+  ///
+  /// 容错：value 不是 Map（例如历史遗留的 List JSON 缓存）时返回 null，
+  /// 而非抛 `type 'List' is not a subtype of type 'Map'` 崩溃。
+  /// 调用方用 `whereType<BookSource>()` 过滤掉 null。
+  BookSource? _decodeSafe(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return null;
+      return BookSource.fromJson(decoded);
+    } catch (_) {
+      return null;
+    }
   }
 }

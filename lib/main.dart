@@ -15,6 +15,8 @@ Future<void> main() async {
   final dir = await getApplicationDocumentsDirectory();
   Hive.init(dir.path);
   final bookSourceBox = await Hive.openBox<String>('book_sources');
+  final bookSourcesCacheBox =
+      await Hive.openBox<String>('book_sources_cache');
   final bookshelfBox =
       await Hive.openBox<String>('bookshelf');
   final readingProgressBox =
@@ -28,14 +30,20 @@ Future<void> main() async {
   final readingStatsBox = await Hive.openBox<String>('reading_stats');
   final readingHistoryBox = await Hive.openBox<String>('reading_history');
   final chapterCacheBox = await Hive.openBox<String>('chapter_cache');
+  // 迁移：清除 book_sources box 中误写的缓存 key（历史 bug 遗留）
+  // 旧版 RemoteBookSources 把 List JSON 写入 box['xiu2_sources']，
+  // 导致 HiveBookSourceRepository.getAll() 遍历到该 value 时
+  // `as Map<String, dynamic>` 崩溃。改用独立 cache box 后需清理脏数据。
+  await _migrateCleanStaleCacheKey(bookSourceBox);
   // 首次启动：从 GitHub 仓库远程拉取书源写入 Hive
   // - 已有书源的用户不会再次写入，避免覆盖用户配置
   // - 拉取失败时静默忽略，App 仍能启动（用户可在书源管理页点「刷新书源」重试）
-  await _seedRemoteBookSources(bookSourceBox);
+  await _seedRemoteBookSources(bookSourceBox, bookSourcesCacheBox);
   runApp(
     ProviderScope(
       overrides: [
         bookSourceBoxProvider.overrideWithValue(bookSourceBox),
+        bookSourcesCacheBoxProvider.overrideWithValue(bookSourcesCacheBox),
         bookshelfBoxProvider.overrideWithValue(bookshelfBox),
         readingProgressBoxProvider.overrideWithValue(readingProgressBox),
         readingPrefsBoxProvider.overrideWithValue(readingPrefsBox),
@@ -56,15 +64,26 @@ Future<void> main() async {
 /// 流程：
 ///   1. Box 非空 → 已有书源（用户配置过），跳过
 ///   2. Box 为空 → 通过 [RemoteBookSources] 拉取远程 JSON
-///      - 拉取成功 → 缓存到 box 的 `xiu2_sources` key + 逐条写入各书源 URL
+///      - 拉取成功 → 缓存到独立的 [cacheBox] + 逐条写入各书源 URL 到 [box]
 ///      - 拉取失败 → 静默忽略，App 启动后用户可在书源管理页重试
-Future<void> _seedRemoteBookSources(Box<String> box) async {
+Future<void> _seedRemoteBookSources(
+    Box<String> box, Box<String> cacheBox) async {
   if (box.isNotEmpty) return;
-  final fetcher = RemoteBookSources(cacheBox: box);
+  final fetcher = RemoteBookSources(cacheBox: cacheBox);
   final sources = await fetcher.fetch(forceRefresh: true);
   for (final s in sources) {
     await box.put(s.bookSourceUrl, jsonEncode(s.toJson()));
   }
+}
+
+/// 迁移：清除 `book_sources` box 中误写的缓存 key。
+///
+/// 旧版本把远程书源 List JSON 写入 `box['xiu2_sources']`，导致
+/// `HiveBookSourceRepository.getAll()` 遍历到该 value 时
+/// `jsonDecode(s) as Map<String, dynamic>` 崩溃。
+/// 改用独立 cache box 后，需删除遗留的脏 key。
+Future<void> _migrateCleanStaleCacheKey(Box<String> box) async {
+  await box.delete('xiu2_sources');
 }
 
 class BookReaderApp extends ConsumerStatefulWidget {
