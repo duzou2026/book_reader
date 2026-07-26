@@ -51,9 +51,140 @@ class RuleEngine {
     Map<String, dynamic>? book,
   }) {
     if (rule.isEmpty) return null;
+
+    // 备选规则：依次尝试，返回首个非空结果
+    // 单个备选抛异常（如 JS 执行失败、regex 非法）时跳过，尝试下一个
+    final alternatives = _extractAlternatives(rule);
+    for (final alt in alternatives) {
+      try {
+        final result = _evalSingle(input, alt, baseUrl: baseUrl, book: book);
+        if (result != null && result.isNotEmpty) return result;
+      } catch (_) {
+        // 备选规则执行失败，尝试下一个
+      }
+    }
+    return null;
+  }
+
+  /// 对列表规则求值（用于 bookList、chapterList 这类返回多节点的规则）。
+  List<String> evalList(
+    String input,
+    String rule, {
+    String? baseUrl,
+    Map<String, dynamic>? book,
+  }) {
+    if (rule.isEmpty) return [];
+    final alternatives = _extractAlternatives(rule);
+    for (final alt in alternatives) {
+      try {
+        final result = _evalListSingle(input, alt, baseUrl: baseUrl, book: book);
+        if (result.isNotEmpty) return result;
+      } catch (_) {
+        // 备选规则执行失败，尝试下一个
+      }
+    }
+    return [];
+  }
+
+  /// 对 bookList 规则求值，返回 Element 列表。
+  ///
+  /// 用于「先取节点、再在每个节点上分别应用 name/author/bookUrl 规则」的场景。
+  /// 后续配合 [evalOnElement] 使用。
+  /// 支持 CSS、legado 旧式语法、XPath 三种规则。
+  List<Element> evalElements(String html, String rule) {
+    if (rule.isEmpty) return [];
+    final alternatives = _extractAlternatives(rule);
+    for (final alt in alternatives) {
+      try {
+        final elements = _evalElementsSingle(html, alt);
+        if (elements.isNotEmpty) return elements;
+      } catch (_) {
+        // 备选规则执行失败，尝试下一个
+      }
+    }
+    return [];
+  }
+
+  /// 在已选定的 Element 上应用规则。
+  ///
+  /// 用于：先用 [evalElements] 拿到 bookList 节点列表，
+  /// 再对每个节点用本方法提取 name/author/coverUrl 等字段。
+  String? evalOnElement(Element element, String rule) {
+    if (rule.isEmpty) return null;
+
+    final alternatives = _extractAlternatives(rule);
+    for (final alt in alternatives) {
+      try {
+        final result = _evalOnElementSingle(element, alt);
+        if (result != null && result.isNotEmpty) return result;
+      } catch (_) {
+        // 备选规则执行失败，尝试下一个
+      }
+    }
+    return null;
+  }
+
+  // ---------- 备选规则拆分 ----------
+
+  /// 把规则拆分为多个备选规则。
+  ///
+  /// legado 支持两种「备选」语法：
+  ///   1. `<js>...</js><fallback>`：JS 失败或返回空时用 fallback
+  ///      （如 笔阅读器 bookList: `<js>eval(...);decode(result);</js>$.result.list||$.result..list[*]`）
+  ///   2. `rule1||rule2||rule3`：依次尝试，返回首个非空
+  /// 两种可以组合。
+  ///
+  /// 注意：
+  /// - `##regex##replacement` 净化段会被剥离后追加到每个备选规则末尾
+  /// - `@regex:` / `regex:` 规则内的 `||` 是正则语义，不分割
+  List<String> _extractAlternatives(String rule) {
+    // 1. 剥离末尾的 ##purify 段（净化段不参与 || 分割）
+    final purifyMatch = RegExp(r'##(.*)$').firstMatch(rule);
+    final mainRule =
+        purifyMatch != null ? rule.substring(0, purifyMatch.start) : rule;
+    final purifyPart = purifyMatch != null ? rule.substring(purifyMatch.start) : '';
+
+    final alternatives = <String>[];
+    var rest = mainRule.trim();
+
+    // 2. <js>...</js> 前缀：JS 作为第一个备选，剩余部分作为后续备选
+    if (rest.startsWith('<js>')) {
+      final endIdx = rest.indexOf('</js>');
+      if (endIdx >= 0) {
+        alternatives.add(rest.substring(0, endIdx + 5));
+        rest = rest.substring(endIdx + 5).trim();
+      }
+    }
+
+    // 3. || 分隔（regex 规则不分割，里面的 || 是正则语义）
+    if (rest.contains('||') &&
+        !rest.startsWith('@regex:') &&
+        !rest.startsWith('regex:')) {
+      alternatives.addAll(
+          rest.split('||').map((s) => s.trim()).where((s) => s.isNotEmpty));
+    } else if (rest.isNotEmpty) {
+      alternatives.add(rest);
+    }
+
+    // 4. 把净化段加回到每个备选规则上
+    if (purifyPart.isNotEmpty) {
+      return alternatives.map((a) => a + purifyPart).toList();
+    }
+    return alternatives;
+  }
+
+  // ---------- 单备选规则的求值 ----------
+
+  String? _evalSingle(
+    String input,
+    String rule, {
+    String? baseUrl,
+    Map<String, dynamic>? book,
+  }) {
     // 处理规则末尾的 `##regex##replacement` 净化段
     final purifyMatch = RegExp(r'##(.*)$').firstMatch(rule);
-    final cleanRule = purifyMatch != null ? rule.substring(0, purifyMatch.start) : rule;
+    final cleanRule =
+        purifyMatch != null ? rule.substring(0, purifyMatch.start) : rule;
     final purifyPart = purifyMatch?.group(1);
 
     String? result;
@@ -88,14 +219,12 @@ class RuleEngine {
     return result;
   }
 
-  /// 对列表规则求值（用于 bookList、chapterList 这类返回多节点的规则）。
-  List<String> evalList(
+  List<String> _evalListSingle(
     String input,
     String rule, {
     String? baseUrl,
     Map<String, dynamic>? book,
   }) {
-    if (rule.isEmpty) return [];
     switch (_parser.detect(rule)) {
       case RuleType.css:
         return _css.queryList(input, rule);
@@ -120,13 +249,7 @@ class RuleEngine {
     }
   }
 
-  /// 对 bookList 规则求值，返回 Element 列表。
-  ///
-  /// 用于「先取节点、再在每个节点上分别应用 name/author/bookUrl 规则」的场景。
-  /// 后续配合 [evalOnElement] 使用。
-  /// 支持 CSS、legado 旧式语法、XPath 三种规则。
-  List<Element> evalElements(String html, String rule) {
-    if (rule.isEmpty) return [];
+  List<Element> _evalElementsSingle(String html, String rule) {
     switch (_parser.detect(rule)) {
       case RuleType.css:
         return _css.queryElements(html, rule);
@@ -142,15 +265,11 @@ class RuleEngine {
     }
   }
 
-  /// 在已选定的 Element 上应用规则。
-  ///
-  /// 用于：先用 [evalElements] 拿到 bookList 节点列表，
-  /// 再对每个节点用本方法提取 name/author/coverUrl 等字段。
-  String? evalOnElement(Element element, String rule) {
-    if (rule.isEmpty) return null;
+  String? _evalOnElementSingle(Element element, String rule) {
     // 处理净化段
     final purifyMatch = RegExp(r'##(.*)$').firstMatch(rule);
-    final cleanRule = purifyMatch != null ? rule.substring(0, purifyMatch.start) : rule;
+    final cleanRule =
+        purifyMatch != null ? rule.substring(0, purifyMatch.start) : rule;
     final purifyPart = purifyMatch?.group(1);
 
     String? result;
@@ -173,7 +292,7 @@ class RuleEngine {
       case RuleType.json:
       case RuleType.regex:
       case RuleType.js:
-        result = eval(element.outerHtml, cleanRule);
+        result = _evalSingle(element.outerHtml, cleanRule);
         break;
     }
 
@@ -187,6 +306,7 @@ class RuleEngine {
   ///
   /// 格式：`regex##replacement`，其中 replacement 可省略（默认空字符串）。
   /// 多条规则用 `||` 分隔。
+  /// 替换串中可引用捕获组：`$1`、`$2`、`$<name>`。
   String _applyPurify(String input, String purifyRule) {
     var result = input;
     // 支持 || 分隔多条净化规则

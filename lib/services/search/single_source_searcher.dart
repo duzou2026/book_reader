@@ -30,10 +30,15 @@ class SingleSourceSearcher {
     final rule = source.ruleSearch;
     if (searchUrl == null || rule == null) return [];
 
-    // 解析 searchUrl：支持 url,{json} 配置段和 POST 请求
-    final config = SearchUrlParser.parse(searchUrl, keyword: keyword, page: 1);
+    // 解析 searchUrl：支持 url,{json} 配置段、POST 请求、@js:url="..." 静态提取
+    final config = SearchUrlParser.parse(
+      searchUrl,
+      keyword: keyword,
+      page: 1,
+      baseUrl: source.bookSourceUrl,
+    );
     if (config == null) {
-      // @js: 规则等暂不支持，跳过
+      // 复杂 @js: 规则等暂不支持，跳过
       return [];
     }
 

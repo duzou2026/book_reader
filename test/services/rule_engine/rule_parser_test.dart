@@ -42,4 +42,30 @@ void main() {
       expect(parser.detect(''), RuleType.plain);
     });
   });
+
+  group('RuleParser.detect - legado vs CSS 区分', () {
+    test('多 @ 步骤链 → legado（非 CSS）', () {
+      // 就爱文学真实规则
+      expect(parser.detect('#author@tbody@tr!0'), RuleType.legado);
+      expect(parser.detect('div@span@text'), RuleType.legado);
+      expect(parser.detect('class.foo@tag.a@text'), RuleType.legado);
+    });
+
+    test('!N 索引语法 → legado', () {
+      expect(parser.detect('tag.a!0'), RuleType.legado);
+      expect(parser.detect('tr!0'), RuleType.legado);
+    });
+
+    test('单 @ + 属性名 → CSS（属性提取器）', () {
+      expect(parser.detect('.title@text'), RuleType.css);
+      expect(parser.detect('#foo@href'), RuleType.css);
+    });
+
+    test('纯 CSS 选择器仍判为 CSS', () {
+      expect(parser.detect('.search-card'), RuleType.css);
+      expect(parser.detect('.v-list-item'), RuleType.css);
+      expect(parser.detect('#content'), RuleType.css);
+      expect(parser.detect('.foo > .bar'), RuleType.css);
+    });
+  });
 }

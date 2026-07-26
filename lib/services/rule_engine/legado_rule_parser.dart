@@ -62,7 +62,13 @@ class LegadoRuleParser {
 
   /// 判断一个规则字符串是否是 legado 旧式语法。
   ///
-  /// 判定标准：含 `class.` / `tag.` / `id.` / `children.` 前缀之一。
+  /// 判定标准（满足任一）：
+  ///   - 含 `class.` / `tag.` / `id.` / `children.` 前缀
+  ///   - 含多个 `@` 步骤分隔符（如 `#author@tbody@tr!0`）
+  ///   - 含 `!N` 末尾索引语法（如 `tag.a!0`）
+  ///
+  /// 不视为 legado 的情形：
+  ///   - 单个 `@` 后接已知属性名（如 `.title@text`）→ 这是 CSS + 属性提取器
   static bool isLegadoRule(String rule) {
     final trimmed = rule.trim();
     // 去掉前缀（虽然旧式语法通常不带前缀，但保险起见）
@@ -74,8 +80,23 @@ class LegadoRuleParser {
         break;
       }
     }
-    // 检查是否以 legado 旧式类型前缀开头
-    return RegExp(r'^(class|tag|id|children)\.').hasMatch(r);
+    // 1. 含 legado 旧式类型前缀：class. / tag. / id. / children.
+    if (RegExp(r'^(class|tag|id|children)\.').hasMatch(r)) return true;
+    // 2. 含 !N 末尾索引 → legado 索引语法
+    if (RegExp(r'!\d+').hasMatch(r)) return true;
+    // 3. 含 @ 步骤分隔符
+    if (r.contains('@')) {
+      // 排除 JSONPath（$ 开头）
+      if (r.startsWith(r'$')) return false;
+      final atCount = '@'.allMatches(r).length;
+      if (atCount >= 2) {
+        // 多个 @ → legado 步骤链（CSS 不会用 @ 串接）
+        return true;
+      }
+      // 单个 @：可能是 CSS + 属性提取器（如 .foo@text），不视为 legado
+      return false;
+    }
+    return false;
   }
 
   // ---------- 内部实现 ----------
@@ -139,14 +160,16 @@ class LegadoRuleParser {
   }
 
   /// 解析单个步骤。
+  ///
+  /// 支持的形态：
+  ///   - `class.book-info.0` / `tag.a` / `id.content` / `children` （旧式类型前缀）
+  ///   - `#author` / `.item` （CSS-like 简写：#id / .class）
+  ///   - `tbody` / `tr` （纯标签名）
+  ///   - `0` / `1` （数字索引）
+  ///   - 上述任一 + `!N` 末尾索引（如 `tag.a!0` / `tr!0`）
   _Step? _parseStep(String s) {
-    // 形如 "class.book-info.0" / "tag.a" / "id.content" / ".0" / "tag.a!0"
-    // 先按 `.` 拆分
-    final parts = s.split('.');
-    if (parts.isEmpty) return null;
+    if (s.isEmpty) return null;
 
-    var type = '';
-    var name = '';
     var index = 0;
     var hasIndex = false;
 
@@ -157,40 +180,52 @@ class LegadoRuleParser {
       index = int.parse(bangMatch.group(1)!);
       hasIndex = true;
       working = working.substring(0, bangMatch.start);
-      parts
-        ..clear()
-        ..addAll(working.split('.'));
+    }
+    if (working.isEmpty) return null;
+
+    // CSS-like 简写：#id / .class
+    if (working.startsWith('#') && working.length > 1) {
+      return _Step('id', working.substring(1), index, hasIndex);
+    }
+    if (working.startsWith('.') && working.length > 1) {
+      return _Step('class', working.substring(1), index, hasIndex);
     }
 
+    final parts = working.split('.');
+    if (parts.isEmpty) return null;
+
+    // legado 旧式类型前缀：class.xxx / tag.xxx / id.xxx / children
     if (parts[0] == 'class' || parts[0] == 'tag' || parts[0] == 'id' ||
         parts[0] == 'children') {
-      type = parts[0];
-      if (parts.length >= 2) name = parts[1];
+      final type = parts[0];
+      final name = parts.length >= 2 ? parts[1] : '';
+      var idx = index;
+      var hasIdx = hasIndex;
       if (parts.length >= 3) {
-        index = int.tryParse(parts[2]) ?? 0;
-        hasIndex = true;
+        idx = int.tryParse(parts[2]) ?? 0;
+        hasIdx = true;
       }
-    } else if (parts.length == 1 && _isInt(parts[0])) {
-      // 形如 ".0" → 取第 0 个子元素
-      type = 'index';
-      index = int.parse(parts[0]);
-      hasIndex = true;
-    } else if (parts.length == 2 && _isInt(parts[1])) {
-      // 形如 "tag.0" → 退化为索引
-      type = 'index';
-      index = int.parse(parts[1]);
-      hasIndex = true;
-    } else {
-      // 无法识别，当作标签名
-      type = 'tag';
-      name = parts[0];
-      if (parts.length >= 2 && _isInt(parts[1])) {
-        index = int.parse(parts[1]);
-        hasIndex = true;
-      }
+      return _Step(type, name, idx, hasIdx);
     }
 
-    return _Step(type, name, index, hasIndex);
+    // 纯数字 → 索引
+    if (parts.length == 1 && _isInt(parts[0])) {
+      return _Step('index', '', int.parse(parts[0]), true);
+    }
+    // 形如 "tag.0" → 退化为索引
+    if (parts.length == 2 && _isInt(parts[1])) {
+      return _Step('index', '', int.parse(parts[1]), true);
+    }
+
+    // 退化为标签名
+    var tagName = parts[0];
+    var idx = index;
+    var hasIdx = hasIndex;
+    if (parts.length >= 2 && _isInt(parts[1])) {
+      idx = int.parse(parts[1]);
+      hasIdx = true;
+    }
+    return _Step('tag', tagName, idx, hasIdx);
   }
 
   bool _isInt(String s) => int.tryParse(s) != null;

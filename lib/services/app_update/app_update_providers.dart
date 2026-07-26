@@ -3,21 +3,33 @@ import 'package:book_reader/services/app_update/app_update_info.dart';
 import 'package:book_reader/services/app_update/apk_installer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// 当前 App 的 owner/repo（Gitee 仓库）。
+/// 当前 App 的 Gitee 仓库（国内首选更新源）。
 ///
-/// 用 Gitee 而非 GitHub：国内访问稳定，App 内更新检查 + APK 下载均走 Gitee。
 /// 仓库地址：https://gitee.com/duzou_5aidnf/novel-reader
 const String kGiteeOwner = 'duzou_5aidnf';
 const String kGiteeRepo = 'novel-reader';
+
+/// GitHub 仓库（回退更新源）。
+///
+/// CI 上传 APK 到 GitHub Release 始终成功；Gitee 跨境上传经常超时失败，
+/// 当 Gitee release 无 APK 资产时回退到 GitHub。
+/// 仓库地址：https://github.com/duzou2026/book_reader
+const String kGithubOwner = 'duzou2026';
+const String kGithubRepo = 'book_reader';
 
 /// 当前 App 版本号（与 pubspec.yaml 的 version 字段一致，不含 +build）。
 ///
 /// 注意：每次 bump pubspec.yaml 后需要同步更新这里。
 /// 未来可改用 `package_info_plus` 自动读取，避免手动同步。
-const String kCurrentAppVersion = '0.3.0';
+const String kCurrentAppVersion = '0.3.1';
 
 final appUpdateCheckerProvider = Provider<AppUpdateChecker>((ref) {
-  return AppUpdateChecker(owner: kGiteeOwner, repo: kGiteeRepo);
+  return AppUpdateChecker(
+    giteeOwner: kGiteeOwner,
+    giteeRepo: kGiteeRepo,
+    githubOwner: kGithubOwner,
+    githubRepo: kGithubRepo,
+  );
 });
 
 final apkInstallerProvider = Provider<ApkInstaller>((ref) {

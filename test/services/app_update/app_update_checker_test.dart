@@ -20,8 +20,10 @@ void main() {
     test('parses a standard GitHub release payload', () async {
       adapter.response = _sampleReleasePayload();
       final checker = AppUpdateChecker(
-        owner: 'duzou2026',
-        repo: 'book_reader',
+        giteeOwner: 'duzou2026',
+        giteeRepo: 'book_reader',
+        githubOwner: 'duzou2026',
+        githubRepo: 'book_reader',
         dio: dio,
       );
       final info = await checker.fetchLatestRelease();
@@ -41,8 +43,10 @@ void main() {
     test('throws FormatException when tag_name missing', () async {
       adapter.response = {'name': 'no tag'};
       final checker = AppUpdateChecker(
-        owner: 'x',
-        repo: 'y',
+        giteeOwner: 'x',
+        giteeRepo: 'y',
+        githubOwner: 'x',
+        githubRepo: 'y',
         dio: dio,
       );
       expect(checker.fetchLatestRelease(),
@@ -66,7 +70,7 @@ void main() {
           'content_type': 'text/plain',
         },
       ]);
-      final checker = AppUpdateChecker(owner: 'x', repo: 'y', dio: dio);
+      final checker = AppUpdateChecker(giteeOwner: 'x', giteeRepo: 'y', githubOwner: 'x', githubRepo: 'y', dio: dio);
       final info = await checker.fetchLatestRelease();
       expect(info.assets.length, 3);
       expect(info.assets.every((a) => a.name.endsWith('.apk')), isTrue);
@@ -81,7 +85,7 @@ void main() {
         'html_url': '',
         'assets': [],
       };
-      final checker = AppUpdateChecker(owner: 'x', repo: 'y', dio: dio);
+      final checker = AppUpdateChecker(giteeOwner: 'x', giteeRepo: 'y', githubOwner: 'x', githubRepo: 'y', dio: dio);
       final info = await checker.fetchLatestRelease();
       expect(info.assets, isEmpty);
     });
@@ -91,7 +95,7 @@ void main() {
         'tag_name': 'v0.0.1',
         'name': 'no assets field',
       };
-      final checker = AppUpdateChecker(owner: 'x', repo: 'y', dio: dio);
+      final checker = AppUpdateChecker(giteeOwner: 'x', giteeRepo: 'y', githubOwner: 'x', githubRepo: 'y', dio: dio);
       final info = await checker.fetchLatestRelease();
       expect(info.assets, isEmpty);
     });
@@ -103,7 +107,7 @@ void main() {
       final adapter = MockAdapter();
       adapter.response = _sampleReleasePayload(tagName: 'v0.9.9');
       dio.httpClientAdapter = adapter;
-      final checker = AppUpdateChecker(owner: 'x', repo: 'y', dio: dio);
+      final checker = AppUpdateChecker(giteeOwner: 'x', giteeRepo: 'y', githubOwner: 'x', githubRepo: 'y', dio: dio);
       final useCase = CheckForUpdate(checker: checker, currentVersion: '0.2.2');
       final result = await useCase();
       expect(result, isNotNull);
@@ -115,7 +119,7 @@ void main() {
       final adapter = MockAdapter();
       adapter.response = _sampleReleasePayload(tagName: 'v0.2.2');
       dio.httpClientAdapter = adapter;
-      final checker = AppUpdateChecker(owner: 'x', repo: 'y', dio: dio);
+      final checker = AppUpdateChecker(giteeOwner: 'x', giteeRepo: 'y', githubOwner: 'x', githubRepo: 'y', dio: dio);
       final useCase = CheckForUpdate(checker: checker, currentVersion: '0.2.2');
       final result = await useCase();
       expect(result, isNull);
@@ -126,7 +130,7 @@ void main() {
       final adapter = MockAdapter();
       adapter.response = _sampleReleasePayload(tagName: 'v0.1.0');
       dio.httpClientAdapter = adapter;
-      final checker = AppUpdateChecker(owner: 'x', repo: 'y', dio: dio);
+      final checker = AppUpdateChecker(giteeOwner: 'x', giteeRepo: 'y', githubOwner: 'x', githubRepo: 'y', dio: dio);
       final useCase = CheckForUpdate(checker: checker, currentVersion: '0.2.2');
       final result = await useCase();
       expect(result, isNull);

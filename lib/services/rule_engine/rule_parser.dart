@@ -46,11 +46,12 @@ class RuleParser {
     if (trimmed.startsWith('//') || trimmed.startsWith('/')) {
       return RuleType.xpath;
     }
-    // legado 旧式语法：以 class. / tag. / id. / children. 开头
+    // legado 旧式语法：以 class. / tag. / id. / children. 开头，
+    // 或含 @ 步骤分隔符 / !N 索引语法（如 #author@tbody@tr!0）
     if (LegadoRuleParser.isLegadoRule(trimmed)) {
       return RuleType.legado;
     }
-    // 形如 ".foo > .bar" 或 ".foo@text" 视为 CSS
+    // 形如 ".foo > .bar" 或 "#foo .bar" 视为 CSS
     if (_looksLikeCss(trimmed)) {
       return RuleType.css;
     }
@@ -58,14 +59,21 @@ class RuleParser {
     return RuleType.plain;
   }
 
-  /// 简单启发式：含 CSS 选择器特征字符（. # > + ~）且不含空格分隔的命令时，视为 CSS。
+  /// 简单启发式：判断字符串是否符合 CSS 选择器形态。
+  ///
+  /// CSS 选择器的关键特征：
+  ///   - 含 `.` / `#` / `>` / `+` / `~` 等组合符
+  ///   - **不含 `@`**（legado 用 @ 作步骤分隔符，CSS 选择器不会用到）
+  ///   - **不含 `!N` 末尾索引**（legado 的索引语法）
   bool _looksLikeCss(String s) {
+    // 含 @ → legado 步骤分隔符，不是 CSS
+    if (s.contains('@')) return false;
+    // 末尾的 !N → legado 索引语法
+    if (RegExp(r'!\d+$').hasMatch(s)) return false;
     final cssHints = ['.', '#', '>', ' + ', ' ~ '];
-    var hits = 0;
     for (final h in cssHints) {
-      if (s.contains(h)) hits++;
+      if (s.contains(h)) return true;
     }
-    // 至少有一个 CSS 特征字符
-    return hits >= 1;
+    return false;
   }
 }
