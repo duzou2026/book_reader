@@ -31,8 +31,8 @@ _$BookSourceImpl _$$BookSourceImplFromJson(Map<String, dynamic> json) =>
           : RuleContent.fromJson(json['ruleContent'] as Map<String, dynamic>),
       priority: (json['priority'] as num?)?.toInt() ?? 0,
       weight: (json['weight'] as num?)?.toInt() ?? 0,
-      lastUpdateTime: json['lastUpdateTime'] as String?,
-      respondTime: json['respondTime'] as String?,
+      lastUpdateTime: _asObject(json['lastUpdateTime']),
+      respondTime: _asObject(json['respondTime']),
       weightValue: json['weightValue'] as String?,
     );
 

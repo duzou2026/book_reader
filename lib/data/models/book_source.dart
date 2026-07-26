@@ -3,6 +3,12 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'book_source.freezed.dart';
 part 'book_source.g.dart';
 
+/// legado 书源 JSON 里 lastUpdateTime / respondTime 字段类型不固定：
+/// 有的书源用 int（毫秒时间戳），有的用 String。
+/// 这两个辅助函数用 Object? 兼容两种类型，避免 `as String?` 在 int 时崩溃。
+Object? _asObject(Object? v) => v;
+Object? _objectToJson(Object? v) => v;
+
 /// 书源类型：0=文本小说，1=有声书
 enum BookSourceType {
   @JsonValue(0) text,
@@ -27,8 +33,10 @@ class BookSource with _$BookSource {
     RuleContent? ruleContent,
     @Default(0) int priority,
     @Default(0) int weight,
-    String? lastUpdateTime,
-    String? respondTime,
+    /// legado 书源里这两个字段有时是 int（毫秒时间戳），有时是 String。
+    /// 用 Object? 兼容两种类型，避免 `as String?` 在 int 时崩溃。
+    @JsonKey(fromJson: _asObject, toJson: _objectToJson) Object? lastUpdateTime,
+    @JsonKey(fromJson: _asObject, toJson: _objectToJson) Object? respondTime,
     String? weightValue,
   }) = _BookSource;
 

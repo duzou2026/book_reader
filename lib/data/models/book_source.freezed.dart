@@ -33,8 +33,8 @@ mixin _$BookSource {
   RuleContent? get ruleContent => throw _privateConstructorUsedError;
   int get priority => throw _privateConstructorUsedError;
   int get weight => throw _privateConstructorUsedError;
-  String? get lastUpdateTime => throw _privateConstructorUsedError;
-  String? get respondTime => throw _privateConstructorUsedError;
+  Object? get lastUpdateTime => throw _privateConstructorUsedError;
+  Object? get respondTime => throw _privateConstructorUsedError;
   String? get weightValue => throw _privateConstructorUsedError;
 
   /// Serializes this BookSource to a JSON map.
@@ -67,8 +67,8 @@ abstract class $BookSourceCopyWith<$Res> {
       RuleContent? ruleContent,
       int priority,
       int weight,
-      String? lastUpdateTime,
-      String? respondTime,
+      Object? lastUpdateTime,
+      Object? respondTime,
       String? weightValue});
 
   $RuleSearchCopyWith<$Res>? get ruleSearch;
@@ -256,8 +256,8 @@ abstract class _$$BookSourceImplCopyWith<$Res>
       RuleContent? ruleContent,
       int priority,
       int weight,
-      String? lastUpdateTime,
-      String? respondTime,
+      Object? lastUpdateTime,
+      Object? respondTime,
       String? weightValue});
 
   @override
@@ -424,9 +424,9 @@ class _$BookSourceImpl implements _BookSource {
   @JsonKey()
   final int weight;
   @override
-  final String? lastUpdateTime;
+  final Object? lastUpdateTime;
   @override
-  final String? respondTime;
+  final Object? respondTime;
   @override
   final String? weightValue;
 
@@ -523,8 +523,8 @@ abstract class _BookSource implements BookSource {
       final RuleContent? ruleContent,
       final int priority,
       final int weight,
-      final String? lastUpdateTime,
-      final String? respondTime,
+      final Object? lastUpdateTime,
+      final Object? respondTime,
       final String? weightValue}) = _$BookSourceImpl;
 
   factory _BookSource.fromJson(Map<String, dynamic> json) =
@@ -557,9 +557,9 @@ abstract class _BookSource implements BookSource {
   @override
   int get weight;
   @override
-  String? get lastUpdateTime;
+  Object? get lastUpdateTime;
   @override
-  String? get respondTime;
+  Object? get respondTime;
   @override
   String? get weightValue;
 
