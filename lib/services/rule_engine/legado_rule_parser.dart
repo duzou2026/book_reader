@@ -39,7 +39,9 @@ class LegadoRuleParser {
     if (steps.isEmpty) return [];
 
     final doc = html_parser.parse(html);
-    return _applySteps(doc, steps);
+    final root = doc.documentElement;
+    if (root == null) return [];
+    return _applySteps(root, steps);
   }
 
   /// 在已选定的 Element 上按 rule 提取字段。
@@ -215,7 +217,7 @@ class LegadoRuleParser {
         matches = parent.getElementsByClassName(step.name);
         break;
       case 'id':
-        final el = parent.getElementById(step.name);
+        final el = parent.querySelector('#${step.name}');
         matches = el == null ? <Element>[] : [el];
         break;
       case 'tag':

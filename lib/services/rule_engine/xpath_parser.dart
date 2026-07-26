@@ -139,7 +139,7 @@ class XpathParser {
 
       // 解析 [@attr='val'] 或 [@attr]
       final attrMatch =
-          RegExp(r"^@([\w-]+)(?:='([^']*)'|=\"([^\"]*)\"|=(.+))?$")
+          RegExp("^@([\\w-]+)(?:='([^']*)'|=\"([^\"]*)\"|=(.+))?\$")
               .firstMatch(inner.trim());
       if (attrMatch != null) {
         final attrName = attrMatch.group(1)!;

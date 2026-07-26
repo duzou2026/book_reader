@@ -46,9 +46,15 @@ class SearchUrlParser {
 
     Map<String, dynamic>? config;
     try {
-      config = jsonDecode(jsonPart) as Map<String, dynamic>?;
+      final decoded = jsonDecode(jsonPart);
+      if (decoded is Map<String, dynamic>) {
+        config = decoded;
+      }
     } catch (_) {
       // JSON 解析失败，退化为纯 URL
+    }
+
+    if (config == null) {
       final ctx = RuleContext(keyword: keyword, page: page);
       final url = ctx.substitute(raw);
       return RequestConfig(url: url, method: 'GET');
