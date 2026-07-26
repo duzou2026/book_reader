@@ -2,6 +2,10 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: '仅上传 Gitee（已构建的 tag，如 v0.3.0）'
+        required: false
   push:
     tags:
       - 'v*'
@@ -15,6 +19,8 @@ jobs:
     name: Build Release APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # 手动触发且指定 tag 时跳过构建（只走 upload-gitee job）
+    if: ${{ !inputs.tag }}
 
     steps:
       - name: Checkout
@@ -124,45 +130,88 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 同步创建 Gitee Release 并上传 APK（国内用户走 Gitee 更新）
-      # 注意：GitHub Actions runner（美国/欧洲）到 Gitee（国内）的网络不稳定，
-      # 大文件上传经常超时。设 continue-on-error 让构建不因此失败；
-      # 上传失败时需手动从 GitHub Release 下载 APK 再上传到 Gitee。
-      - name: Create Gitee Release & upload APKs (on tag)
-        if: startsWith(github.ref, 'refs/tags/v')
-        continue-on-error: true
+  # 单独的 Gitee 上传 job：可独立重试，不依赖 build job
+  # 触发条件：tag push 后 build 完成，或手动 workflow_dispatch 指定 tag
+  upload-gitee:
+    name: Upload APKs to Gitee
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.tag }}
+    env:
+      GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+      GITEE_OWNER: duzou_5aidnf
+      GITEE_REPO: novel-reader
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve tag & download APKs from GitHub Release
         env:
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-          GITEE_OWNER: duzou_5aidnf
-          GITEE_REPO: novel-reader
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          TAG="${GITHUB_REF##refs/tags/}"
-          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d '+' -f 1)
-          echo "为 Gitee 创建 release: $TAG"
-          # 1. 创建 release
-          RESP=$(curl -sS -X POST \
-            "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases" \
-            -H "Content-Type: application/json;charset=UTF-8" \
-            -d "{\"access_token\":\"${GITEE_TOKEN}\",\"tag_name\":\"${TAG}\",\"name\":\"${TAG}\",\"body\":\"搜书看书 ${VERSION}\",\"target_commitish\":\"master\",\"prerelease\":false}")
-          RELEASE_ID=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
-          if [ -z "$RELEASE_ID" ]; then
-            echo "✗ Gitee release 创建失败: $RESP"
-            exit 1
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG="${GITHUB_REF##refs/tags/}"
           fi
-          echo "✓ Gitee release 已创建, id=$RELEASE_ID"
-          # 2. 逐个上传 APK
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "准备上传 tag $TAG 的 APK 到 Gitee"
+          mkdir -p apks
+          # 从 GitHub Release 下载该 tag 的所有 APK
+          gh release download "$TAG" --dir apks --pattern '*.apk' --repo "$GITHUB_REPOSITORY"
+          ls -lh apks/
+
+      - name: Create / reuse Gitee Release & upload APKs
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d '+' -f 1)
+          # 1. 查找是否已有 release（避免重复创建）
+          RELEASE_ID=$(curl -sS \
+            "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/tags/${TAG}?access_token=${GITEE_TOKEN}" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+          if [ -z "$RELEASE_ID" ]; then
+            echo "Gitee 上不存在 tag $TAG 的 release，创建新 release"
+            RESP=$(curl -sS -X POST \
+              "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases" \
+              -H "Content-Type: application/json;charset=UTF-8" \
+              -d "{\"access_token\":\"${GITEE_TOKEN}\",\"tag_name\":\"${TAG}\",\"name\":\"${TAG}\",\"body\":\"搜书看书 ${VERSION}\",\"target_commitish\":\"master\",\"prerelease\":false}")
+            RELEASE_ID=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+            if [ -z "$RELEASE_ID" ]; then
+              echo "✗ Gitee release 创建失败: $RESP"
+              exit 1
+            fi
+          fi
+          echo "✓ 使用 Gitee release id=$RELEASE_ID"
+          # 2. 逐个上传 APK（带重试）
           # 注意：不要手动设置 -H "Content-Type: multipart/form-data"
           # curl -F 会自动生成带 boundary 的 Content-Type；手动覆盖会丢掉 boundary，
           # 导致 Gitee 服务端无法解析 multipart body，上传请求挂起直至超时。
-          cd build/app/outputs/flutter-apk/
+          cd apks
+          FAIL=0
           for f in book_reader-*.apk; do
             echo "上传 $f ..."
-            # --max-time 60：GitHub runner 到 Gitee 网络不稳定，单次最多等 60s
-            # --retry 1：最多重试 1 次（3 个 APK × 2 次 × 60s = 360s，远低于 job 超时）
-            UPLOAD_RESP=$(curl -sS --max-time 60 --retry 1 --retry-delay 5 -X POST \
-              "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/${RELEASE_ID}/attach_files" \
-              -F "access_token=${GITEE_TOKEN}" \
-              -F "file=@${f}" 2>&1) || { echo "  ✗ 上传 $f 失败（可手动补传）: $UPLOAD_RESP"; continue; }
-            echo "$UPLOAD_RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'  ✓ {d.get(\"name\",\"?\")} -> {d.get(\"browser_download_url\",\"?\")}')" 2>/dev/null || echo "  ⚠ $f 上传响应解析失败: $UPLOAD_RESP"
+            SUCCESS=0
+            for ATTEMPT in 1 2 3; do
+              UPLOAD_RESP=$(curl -sS --max-time 180 --connect-timeout 30 -X POST \
+                "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/${RELEASE_ID}/attach_files" \
+                -F "access_token=${GITEE_TOKEN}" \
+                -F "file=@${f}" 2>&1)
+              if echo "$UPLOAD_RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'  ✓ (第{sys.argv[1]}次) {d.get(\"name\",\"?\")} -> {d.get(\"browser_download_url\",\"?\")}')" "$ATTEMPT" 2>/dev/null; then
+                SUCCESS=1
+                break
+              fi
+              echo "  ⚠ 第 $ATTEMPT 次上传失败: $UPLOAD_RESP"
+              [ "$ATTEMPT" -lt 3 ] && sleep $((ATTEMPT * 10))
+            done
+            if [ "$SUCCESS" -eq 0 ]; then
+              echo "  ✗ $f 3 次重试均失败"
+              FAIL=1
+            fi
           done
-          echo "✓ Gitee release 资产上传完成（失败项需手动补传）"
+          if [ "$FAIL" -eq 1 ]; then
+            echo "✗ 部分 APK 上传失败，请重跑本 job（workflow_dispatch 指定 tag=$TAG）"
+            exit 1
+          fi
+          echo "✓ 全部 APK 上传 Gitee 完成"
+
