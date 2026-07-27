@@ -43,17 +43,61 @@ class ApkInstaller {
       return file;
     }
 
-    await _dio.download(
-      asset.browserDownloadUrl,
-      savePath,
-      onReceiveProgress: onProgress,
-      options: Options(
-        // GitHub release download 不会重定向到登录，直接 follow
-        followRedirects: true,
-        receiveTimeout: const Duration(minutes: 10),
-      ),
-    );
-    return file;
+    // 下载源优先级（国内访问速度从快到慢）：
+    //   1. ghfast.top 镜像 GitHub Release（国内 CDN 加速，实测 6 秒下 25MB）
+    //   2. 原始 GitHub release URL（兜底，国内通常很慢或超时）
+    // Gitee release 经常因跨境上传超时失败而拿不到 APK，不能作为可靠源。
+    final urls = _buildDownloadUrls(asset.browserDownloadUrl);
+    Object? lastError;
+    for (final url in urls) {
+      try {
+        await _dio.download(
+          url,
+          savePath,
+          onReceiveProgress: onProgress,
+          options: Options(
+            followRedirects: true,
+            // 单源超时设短一点，失败快速切下一个源
+            connectTimeout: const Duration(seconds: 15),
+            receiveTimeout: const Duration(minutes: 5),
+          ),
+        );
+        // 下载成功后校验大小（如果已知 size）
+        if (asset.size > 0 && file.existsSync() && file.lengthSync() != asset.size) {
+          // 大小不一致，可能是被截断，删了重试用下一个源
+          await file.delete();
+          continue;
+        }
+        return file;
+      } catch (e) {
+        lastError = e;
+        // 当前源失败，删除可能残留的半成品文件，尝试下一个源
+        if (file.existsSync()) {
+          try {
+            await file.delete();
+          } catch (_) {}
+        }
+        continue;
+      }
+    }
+    throw Exception('所有下载源均失败: $lastError');
+  }
+
+  /// 构造下载源 URL 列表（按优先级排序）。
+  ///
+  /// GitHub Release 原始 URL 国内访问极慢或超时，前面加国内可达的镜像前缀。
+  /// 镜像失败时自动回退到原始 URL 兜底。
+  List<String> _buildDownloadUrls(String originalUrl) {
+    final urls = <String>[];
+    // 仅对 github.com 的 release 下载做镜像加速
+    if (originalUrl.contains('github.com') &&
+        originalUrl.contains('/releases/download/')) {
+      // ghfast.top: 国内访问稳定的 GitHub 加速代理，前缀拼接方式
+      urls.add('https://ghfast.top/$originalUrl');
+    }
+    // 原始 URL 作为兜底（Gitee / 其他源直接用原 URL）
+    urls.add(originalUrl);
+    return urls;
   }
 
   /// 调用原生安装器安装 APK。

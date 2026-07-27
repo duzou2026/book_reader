@@ -17,11 +17,11 @@ const String kGiteeRepo = 'novel-reader';
 const String kGithubOwner = 'duzou2026';
 const String kGithubRepo = 'book_reader';
 
-/// 当前 App 版本号（与 pubspec.yaml 的 version 字段一致，不含 +build）。
+/// 当前 App 的版本号（与 pubspec.yaml 的 version 字段一致，不含 +build）。
 ///
 /// 注意：每次 bump pubspec.yaml 后需要同步更新这里。
 /// 未来可改用 `package_info_plus` 自动读取，避免手动同步。
-const String kCurrentAppVersion = '0.3.1';
+const String kCurrentAppVersion = '0.5.1';
 
 final appUpdateCheckerProvider = Provider<AppUpdateChecker>((ref) {
   return AppUpdateChecker(
