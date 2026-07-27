@@ -138,7 +138,7 @@ jobs:
   upload-gitee:
     name: Upload APKs to Gitee
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     needs: build
     if: ${{ always() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag) }}
     env:
@@ -197,7 +197,7 @@ jobs:
             echo "上传 $f ..."
             SUCCESS=0
             for ATTEMPT in 1 2 3; do
-              UPLOAD_RESP=$(curl -sS --max-time 180 --connect-timeout 30 -X POST \
+              UPLOAD_RESP=$(curl -sS --max-time 600 --connect-timeout 30 -X POST \
                 "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/${RELEASE_ID}/attach_files" \
                 -F "access_token=${GITEE_TOKEN}" \
                 -F "file=@${f}" 2>&1)
