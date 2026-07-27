@@ -164,4 +164,125 @@ void main() {
       expect(chapters.length, 1);
     });
   });
+
+  group('TocFetcher.fetch - JSON chapterList', () {
+    /// 模拟酷我小说 / 熊猫看书：目录页返回 JSON，
+    /// chapterList 是 JSONPath（如 $.data 或 $.result.pageList），
+    /// chapterName/chapterUrl 也是作用于每个章节对象的 JSONPath。
+    test('parses JSON chapterList ($.data) with JSONPath fields', () async {
+      const jsonBody = '''
+      {"data":[
+        {"name":"第一章 醒来","url":"/chapter/1","isVip":"false"},
+        {"name":"第二章 启程","url":"/chapter/2","isVip":"true"},
+        {"name":"第三章 抵达","url":"/chapter/3","isVip":"false"}
+      ]}
+      ''';
+      final jsonSource = BookSource(
+        bookSourceName: 'JSON 源',
+        bookSourceUrl: 'https://example.com',
+        ruleToc: const RuleToc(
+          chapterList: r'$.data',
+          chapterName: r'$.name',
+          chapterUrl: r'$.url',
+          isVip: r'$.isVip',
+        ),
+      );
+      fetcher = TocFetcher(
+        fetcher: _FakeFetcher({'https://example.com/toc': jsonBody}),
+        ruleEngine: engine,
+      );
+
+      final chapters =
+          await fetcher.fetch('https://example.com/toc', jsonSource);
+
+      expect(chapters.length, 3);
+      expect(chapters[0].name, '第一章 醒来');
+      expect(chapters[0].url, 'https://example.com/chapter/1');
+      expect(chapters[0].index, 1);
+      expect(chapters[0].isVip, isFalse);
+      expect(chapters[1].name, '第二章 启程');
+      expect(chapters[1].isVip, isTrue);
+      expect(chapters[2].index, 3);
+    });
+
+    test('parses nested JSON chapterList ($.result.pageList)', () async {
+      // 熊猫看书风格：目录嵌在 result.pageList
+      const jsonBody = '''
+      {"code":0,"result":{"pageList":[
+        {"cN":"第1章","cU":"/c/1"},
+        {"cN":"第2章","cU":"/c/2"}
+      ]}}
+      ''';
+      final jsonSource = BookSource(
+        bookSourceName: '熊猫看书',
+        bookSourceUrl: 'https://example.com',
+        ruleToc: const RuleToc(
+          chapterList: r'$.result.pageList',
+          chapterName: r'$.cN',
+          chapterUrl: r'$.cU',
+        ),
+      );
+      fetcher = TocFetcher(
+        fetcher: _FakeFetcher({'https://example.com/toc': jsonBody}),
+        ruleEngine: engine,
+      );
+
+      final chapters =
+          await fetcher.fetch('https://example.com/toc', jsonSource);
+
+      expect(chapters.length, 2);
+      expect(chapters[0].name, '第1章');
+      expect(chapters[0].url, 'https://example.com/c/1');
+      expect(chapters[1].name, '第2章');
+    });
+
+    test('skips JSON chapters missing name or url', () async {
+      const jsonBody = '''
+      {"data":[
+        {"name":"第一章","url":"/c1"},
+        {"name":"无URL","url":""},
+        {"name":"","url":"/c3"},
+        {"name":"第四章","url":"/c4"}
+      ]}
+      ''';
+      final jsonSource = BookSource(
+        bookSourceName: 'JSON 源',
+        bookSourceUrl: 'https://example.com',
+        ruleToc: const RuleToc(
+          chapterList: r'$.data',
+          chapterName: r'$.name',
+          chapterUrl: r'$.url',
+        ),
+      );
+      fetcher = TocFetcher(
+        fetcher: _FakeFetcher({'https://example.com/toc': jsonBody}),
+        ruleEngine: engine,
+      );
+
+      final chapters =
+          await fetcher.fetch('https://example.com/toc', jsonSource);
+      expect(chapters.length, 2);
+      expect(chapters[0].name, '第一章');
+      expect(chapters[1].name, '第四章');
+    });
+
+    test('returns empty when JSON body is invalid', () async {
+      final jsonSource = BookSource(
+        bookSourceName: 'JSON 源',
+        bookSourceUrl: 'https://example.com',
+        ruleToc: const RuleToc(
+          chapterList: r'$.data',
+          chapterName: r'$.name',
+          chapterUrl: r'$.url',
+        ),
+      );
+      fetcher = TocFetcher(
+        fetcher: _FakeFetcher({'https://example.com/toc': 'not json'}),
+        ruleEngine: engine,
+      );
+      final chapters =
+          await fetcher.fetch('https://example.com/toc', jsonSource);
+      expect(chapters, isEmpty);
+    });
+  });
 }

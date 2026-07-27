@@ -66,10 +66,11 @@ class SingleSourceSearcher {
     // JSON 规则的特殊处理：evalElements 对 JSON 返回空，
     // 需要用 evalList 拿字符串列表，再构造结果
     if (elements.isEmpty) {
-      return _parseJsonBookList(body, bookListRule, source, rule);
+      return _parseJsonBookList(body, bookListRule, source, rule, keyword);
     }
 
     final results = <SearchResult>[];
+    final keywordNorm = _normalize(keyword);
     for (final element in elements) {
       final name = _evalField(element, rule.name);
       final bookUrl = _evalField(element, rule.bookUrl);
@@ -83,6 +84,14 @@ class SingleSourceSearcher {
       final kind = _evalField(element, rule.kind);
       final wordCount = _evalField(element, rule.wordCount);
       final lastChapter = _evalField(element, rule.lastChapter);
+
+      // 关键字相关性过滤：书名或作者须包含搜索关键字（去空格、不区分大小写）。
+      // 部分书源搜索逻辑宽松，会返回与关键字无关的结果（如把关键字当拼音/模糊
+      // 匹配返回热门书），导致用户搜「让存在感消失的手链」却搜出同名无关的
+      // 1024 章小说。这里做一道兜底过滤，避免明显不相关的结果污染列表。
+      if (!_isRelevant(name, author, keywordNorm)) {
+        continue;
+      }
 
       final absoluteBookUrl = _resolveUrl(bookUrl, source.bookSourceUrl);
       final absoluteCoverUrl =
@@ -117,6 +126,7 @@ class SingleSourceSearcher {
     String bookListRule,
     BookSource source,
     RuleSearch rule,
+    String keyword,
   ) {
     // 解析整个响应为 JSON
     dynamic jsonData;
@@ -132,6 +142,7 @@ class SingleSourceSearcher {
     if (items.isEmpty) return [];
 
     final results = <SearchResult>[];
+    final keywordNorm = _normalize(keyword);
     for (final item in items) {
       if (item is! Map<String, dynamic>) continue;
       // 对每个 JSON 对象，用 JSONPath 规则提取字段
@@ -148,6 +159,11 @@ class SingleSourceSearcher {
       final kind = _evalJsonField(itemJson, rule.kind);
       final wordCount = _evalJsonField(itemJson, rule.wordCount);
       final lastChapter = _evalJsonField(itemJson, rule.lastChapter);
+
+      // 关键字相关性过滤（与 Element 路径一致）
+      if (!_isRelevant(name, author, keywordNorm)) {
+        continue;
+      }
 
       final absoluteBookUrl = _resolveUrl(bookUrl, source.bookSourceUrl);
       final absoluteCoverUrl =
@@ -190,10 +206,18 @@ class SingleSourceSearcher {
       final items = ruleEngine.evalList(jsonEncode(jsonData), path);
       // evalList 返回 List<String>，需要再 parse 回 dynamic
       for (final s in items) {
+        dynamic decoded;
         try {
-          result.add(jsonDecode(s));
+          decoded = jsonDecode(s);
         } catch (_) {
-          result.add(s);
+          decoded = s;
+        }
+        // $.data 这种不带 [*] 的路径会返回整个数组的 JSON 字符串，
+        // 需要展开为各个元素；$.data[*] 则已经是逐个元素，无需展开。
+        if (decoded is List) {
+          result.addAll(decoded);
+        } else {
+          result.add(decoded);
         }
       }
     }
@@ -209,6 +233,26 @@ class SingleSourceSearcher {
   String? _evalField(element, String? rule) {
     if (rule == null || rule.isEmpty) return null;
     return ruleEngine.evalOnElement(element, rule);
+  }
+
+  /// 归一化字符串：去前后空白、压缩内部连续空白、转小写。
+  /// 用于关键字与书名/作者做包含判断前的统一处理。
+  static String _normalize(String s) {
+    return s.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  /// 判断搜索结果是否与关键字相关。
+  ///
+  /// 规则：归一化后的「书名」或「作者」任一包含归一化后的关键字即视为相关。
+  /// 这样既能过滤掉书源返回的无关热门书，又不会误伤「按作者搜」的场景。
+  /// 关键字为空（理论上不会发生）时一律放行，避免把所有结果都过滤掉。
+  static bool _isRelevant(String name, String author, String keywordNorm) {
+    if (keywordNorm.isEmpty) return true;
+    final n = _normalize(name);
+    if (n.contains(keywordNorm)) return true;
+    final a = _normalize(author);
+    if (a.contains(keywordNorm)) return true;
+    return false;
   }
 
   /// 把相对 URL 解析为绝对 URL。
