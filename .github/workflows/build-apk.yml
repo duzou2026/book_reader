@@ -171,12 +171,12 @@ jobs:
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d '+' -f 1)
           # 1. 查找是否已有 release（避免重复创建）
-          RELEASE_ID=$(curl -sS \
+          RELEASE_ID=$(curl -sS --max-time 30 \
             "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/tags/${TAG}?access_token=${GITEE_TOKEN}" \
             | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
           if [ -z "$RELEASE_ID" ]; then
             echo "Gitee 上不存在 tag $TAG 的 release，创建新 release"
-            RESP=$(curl -sS -X POST \
+            RESP=$(curl -sS --max-time 30 -X POST \
               "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases" \
               -H "Content-Type: application/json;charset=UTF-8" \
               -d "{\"access_token\":\"${GITEE_TOKEN}\",\"tag_name\":\"${TAG}\",\"name\":\"${TAG}\",\"body\":\"搜书看书 ${VERSION}\",\"target_commitish\":\"master\",\"prerelease\":false}")
@@ -187,35 +187,51 @@ jobs:
             fi
           fi
           echo "✓ 使用 Gitee release id=$RELEASE_ID"
-          # 2. 逐个上传 APK（带重试）
+          # 2. 列出 release 已有资产（避免重复上传同名文件，Gitee 不去重）
+          EXISTING=$(curl -sS --max-time 30 \
+            "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/${RELEASE_ID}?access_token=${GITEE_TOKEN}" \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print('\n'.join(f\"{a.get('id','')}|{a.get('name','')}\" for a in d.get('assets',[])))" 2>/dev/null || echo "")
+          # 3. 逐个上传 APK（短超时 + 5 次重试 + 单文件失败不阻塞其他文件）
+          # 之前用 600s 超时 + 3 次重试，跨境网络抖动时整个 job 超时挂死。
+          # 现在用 180s 超时 + 5 次重试，单次快速失败，总重试时间最多 ~15 分钟，
+          # 且单个 APK 失败不阻塞其他 APK（最后统计失败数）。
           # 注意：不要手动设置 -H "Content-Type: multipart/form-data"
           # curl -F 会自动生成带 boundary 的 Content-Type；手动覆盖会丢掉 boundary，
           # 导致 Gitee 服务端无法解析 multipart body，上传请求挂起直至超时。
           cd apks
           FAIL=0
+          SUCCESS_COUNT=0
           for f in book_reader-*.apk; do
+            # 跳过已存在同名文件（避免 Gitee 重复资产）
+            if echo "$EXISTING" | grep -q "|${f}$"; then
+              echo "✓ $f 已存在，跳过"
+              SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+              continue
+            fi
             echo "上传 $f ..."
             SUCCESS=0
-            for ATTEMPT in 1 2 3; do
-              UPLOAD_RESP=$(curl -sS --max-time 600 --connect-timeout 30 -X POST \
+            for ATTEMPT in 1 2 3 4 5; do
+              UPLOAD_RESP=$(curl -sS --max-time 180 --connect-timeout 15 -X POST \
                 "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/${RELEASE_ID}/attach_files" \
                 -F "access_token=${GITEE_TOKEN}" \
                 -F "file=@${f}" 2>&1)
               if echo "$UPLOAD_RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'  ✓ (第{sys.argv[1]}次) {d.get(\"name\",\"?\")} -> {d.get(\"browser_download_url\",\"?\")}')" "$ATTEMPT" 2>/dev/null; then
                 SUCCESS=1
+                SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
                 break
               fi
-              echo "  ⚠ 第 $ATTEMPT 次上传失败: $UPLOAD_RESP"
-              [ "$ATTEMPT" -lt 3 ] && sleep $((ATTEMPT * 10))
+              echo "  ⚠ 第 $ATTEMPT 次上传失败: $(echo "$UPLOAD_RESP" | head -c 200)"
+              [ "$ATTEMPT" -lt 5 ] && sleep $((ATTEMPT * 5))
             done
             if [ "$SUCCESS" -eq 0 ]; then
-              echo "  ✗ $f 3 次重试均失败"
-              FAIL=1
+              echo "  ✗ $f 5 次重试均失败"
+              FAIL=$((FAIL + 1))
             fi
           done
-          if [ "$FAIL" -eq 1 ]; then
-            echo "✗ 部分 APK 上传失败，请重跑本 job（workflow_dispatch 指定 tag=$TAG）"
+          echo "✓ 上传完成: $SUCCESS_COUNT 成功, $FAIL 失败"
+          if [ "$FAIL" -gt 0 ] && [ "$SUCCESS_COUNT" -eq 0 ]; then
+            echo "✗ 全部 APK 上传失败，请重跑本 job（workflow_dispatch 指定 tag=$TAG）"
             exit 1
           fi
-          echo "✓ 全部 APK 上传 Gitee 完成"
+          echo "✓ 至少有一个 APK 上传成功，可继续（失败的可在下次重跑补齐）"
 
