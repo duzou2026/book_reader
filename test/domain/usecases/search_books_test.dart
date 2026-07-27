@@ -51,8 +51,7 @@ void main() {
   });
 
   group('SearchBooks use case', () {
-    test('falls back to mock results when repository has no sources',
-        () async {
+    test('returns empty when repository has no sources', () async {
       final useCase = SearchBooks(
         aggregator: SearchAggregator(
           searcher: SingleSourceSearcher(
@@ -64,15 +63,11 @@ void main() {
       );
 
       final results = await useCase('三体');
-      // 无启用书源时，走 MockSearchFallback 兜底
-      expect(results, isNotEmpty);
-      expect(results.every((r) =>
-          r.sources.every((s) => s.sourceUrl.startsWith('mock://'))), isTrue);
-      // 兜底结果书名应包含关键字
-      expect(results.every((r) => r.bookName.contains('三体')), isTrue);
+      // 无启用书源时返回空列表（不再用 mock 假数据混淆用户）
+      expect(results, isEmpty);
     });
 
-    test('falls back to mock results when sources return empty', () async {
+    test('returns empty when sources return empty', () async {
       final source = BookSource(
         bookSourceName: '空源',
         bookSourceUrl: 'https://empty.com',
@@ -100,10 +95,8 @@ void main() {
       );
 
       final results = await useCase('三体');
-      // 真实源返回空 → 走 MockSearchFallback 兜底
-      expect(results, isNotEmpty);
-      expect(results.every((r) =>
-          r.sources.every((s) => s.sourceUrl.startsWith('mock://'))), isTrue);
+      // 真实源返回空 → 返回空列表（不再用 mock 假数据混淆用户）
+      expect(results, isEmpty);
     });
 
     test('aggregates results from repository sources', () async {

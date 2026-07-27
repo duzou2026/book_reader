@@ -1,6 +1,7 @@
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/bookshelf_repository.dart';
 import 'package:book_reader/data/models/book_info.dart';
+import 'package:book_reader/data/models/book_source.dart';
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/ui/audio/audio_player_page.dart';
 import 'package:book_reader/ui/book/chapter_download_sheet.dart';
@@ -231,6 +232,38 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     if (info == null) return;
     setState(() => _loadingAudio = true);
     try {
+      // 判断书源类型：文本源走 TTS 朗读，音频源走音频播放器。
+      // 通过 sourceUrl 反查书源配置。
+      final sourceRepo = ref.read(bookSourceRepositoryProvider);
+      final allSources = await sourceRepo.getAll();
+      final source =
+          allSources.where((s) => s.bookSourceUrl == info.sourceUrl).firstOrNull;
+      final isAudioSource = source?.bookSourceType == BookSourceType.audio;
+
+      if (!isAudioSource) {
+        // 文本源：跳转阅读器并自动触发 TTS 朗读。
+        // 需要至少一个章节才能朗读。
+        if (_chapters.isEmpty) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('暂无章节，无法朗读')),
+          );
+          return;
+        }
+        if (!mounted) return;
+        context.push(
+          '/reader',
+          extra: ReaderArgs(
+            book: info,
+            chapters: _chapters,
+            initialIndex: 0,
+            autoStartTts: true,
+          ),
+        );
+        return;
+      }
+
+      // 音频源：走音频播放器
       final useCase = ref.read(getAudioTocProvider);
       final audioChapters = await useCase(info);
       if (!mounted) return;

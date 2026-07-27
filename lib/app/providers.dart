@@ -31,10 +31,12 @@ import 'package:book_reader/services/preferences/reading_progress_repository.dar
 import 'package:book_reader/services/preferences/reading_prefs_repository.dart';
 import 'package:book_reader/services/preferences/theme_prefs_repository.dart';
 import 'package:book_reader/services/tts/tts_service.dart';
+import 'package:book_reader/services/tts/flutter_tts_service.dart';
 import 'package:book_reader/services/rule_engine/rule_engine.dart';
 import 'package:book_reader/services/search/search_aggregator.dart';
 import 'package:book_reader/services/search/search_result_cache.dart';
 import 'package:book_reader/services/search/single_source_searcher.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 import 'package:just_audio/just_audio.dart';
@@ -171,9 +173,17 @@ final chapterCacheRepositoryProvider = Provider<ChapterCacheRepository>((ref) {
   return ChapterCacheRepository(ref.watch(chapterCacheBoxProvider));
 });
 
-/// TTS 服务（默认 NoOp，移动端可 override 为 flutter_tts 实现）。
+/// TTS 服务。
+///
+/// - 移动端（Android/iOS）：使用 [FlutterTtsService]（基于 flutter_tts 插件，
+///   调用系统 TTS 引擎）。
+/// - Web：flutter_tts 不支持，回退到 [NoOpTtsService]（由前端 Web Speech API
+///   自行处理，或直接报错提示）。
 final ttsServiceProvider = Provider<TtsService>((ref) {
-  return NoOpTtsService();
+  if (kIsWeb) {
+    return NoOpTtsService();
+  }
+  return FlutterTtsService();
 });
 
 /// 全局阅读偏好（响应式）：所有页面共享同一份偏好。

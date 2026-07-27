@@ -54,6 +54,22 @@ const String recommendedBookSourceJson = r'''
       "name": "css:.book-name@text",
       "author": "css:.author@text",
       "bookUrl": "css:a@href"
+    },
+    "ruleBookInfo": {
+      "name": "css:h1@text",
+      "author": "css:.book-info p:contains(作者)@text##.*作者[::]",
+      "intro": "css:.intro@text",
+      "coverUrl": "css:.book-cover img@src",
+      "lastChapter": "css:.book-info p:contains(最新)@text##.*最新[::]",
+      "wordCount": "css:.book-info p:contains(字数)@text##.*字数[::]"
+    },
+    "ruleToc": {
+      "chapterList": "css:.chapter-list li",
+      "chapterName": "css:a@text",
+      "chapterUrl": "css:a@href"
+    },
+    "ruleContent": {
+      "content": "css:.chapter-content@html"
     }
   }
 ]

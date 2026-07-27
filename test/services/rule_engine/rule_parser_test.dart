@@ -67,5 +67,21 @@ void main() {
       expect(parser.detect('#content'), RuleType.css);
       expect(parser.detect('.foo > .bar'), RuleType.css);
     });
+
+    test('bare 属性名 → legado（走 LegadoRuleParser.extract 的 bare-attr 分支）', () {
+      // legado 生态里 chapterUrl/bookUrl/coverUrl 常用裸属性名
+      expect(parser.detect('href'), RuleType.legado);
+      expect(parser.detect('src'), RuleType.legado);
+      expect(parser.detect('text'), RuleType.legado);
+      expect(parser.detect('title'), RuleType.legado);
+      expect(parser.detect('content'), RuleType.legado);
+      expect(parser.detect('data-src'), RuleType.legado);
+      expect(parser.detect('data-original'), RuleType.legado);
+    });
+
+    test('含空格的普通文本仍判为 plain（不误判为 bare attr）', () {
+      expect(parser.detect('just literal text'), RuleType.plain);
+      expect(parser.detect('hello world'), RuleType.plain);
+    });
   });
 }

@@ -202,7 +202,14 @@ class RuleEngine {
         result = _js.eval(input, cleanRule, baseUrl: baseUrl, book: book);
         break;
       case RuleType.plain:
-        result = cleanRule;
+        // 含 {{$.path}} 模板的规则（如 /novels/api/book/{{$.book_id}}）：
+        // 把每个 {{$.path}} 用 JSONPath 从 input 中提取的值替换。
+        // input 非 JSON 或路径不存在时，对应位置替换为空串。
+        if (RegExp(r'\{\{\$\.').hasMatch(cleanRule)) {
+          result = _substituteJsonTemplate(cleanRule, input);
+        } else {
+          result = cleanRule;
+        }
         break;
       case RuleType.legado:
         result = _legado.queryFirst(input, cleanRule);
@@ -217,6 +224,36 @@ class RuleEngine {
       result = _applyPurify(result, purifyPart);
     }
     return result;
+  }
+
+  /// 把模板中的 `{{$.path}}` 用 JSONPath 从 [jsonInput] 提取的值替换。
+  ///
+  /// 用于 legado 书源里 URL 模板场景：
+  ///   - searchUrl 的 bookUrl: `/novels/api/book/{{$.book_id}}`
+  ///   - ruleBookInfo 的 tocUrl: `/novels/api/book/{{$.book_id}}/chapters?paging=0`
+  ///   - ruleToc 的 chapterUrl: `/novels/api/book/{{$.book_id}}/chapters/{{$.chapter_id}}`
+  ///
+  /// 模板中的 `{{$.path}}` 会被替换为对应 JSONPath 查询结果；
+  /// 查询失败（路径不存在 / input 非 JSON）时替换为空串。
+  /// 不含 `{{$.` 的模板原样返回。
+  String _substituteJsonTemplate(String template, String jsonInput) {
+    if (!template.contains('{{\$')) return template;
+    final trimmedInput = jsonInput.trim();
+    if (!trimmedInput.startsWith('{') && !trimmedInput.startsWith('[')) {
+      return template;
+    }
+    final regExp = RegExp(r'\{\{\$([^}]+)\}\}');
+    return template.replaceAllMapped(regExp, (m) {
+      final path = m.group(1)!;
+      // 路径以 . 开头（如 $.book_id → path 是 .book_id）
+      // 也可能直接是字段名（如 $book_id → path 是 book_id）
+      var jsonPath = path.startsWith('.') ? '\$$path' : '\$.$path';
+      try {
+        return _jsonPath.queryFirst(jsonInput, jsonPath) ?? '';
+      } catch (_) {
+        return '';
+      }
+    });
   }
 
   List<String> _evalListSingle(

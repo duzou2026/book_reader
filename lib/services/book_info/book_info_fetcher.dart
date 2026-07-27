@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:book_reader/data/models/book_info.dart';
 import 'package:book_reader/data/models/book_source.dart';
 import 'package:book_reader/services/http/book_source_fetcher.dart';
@@ -35,14 +37,28 @@ class BookInfoFetcher {
       );
     }
 
-    final name = _eval(body, rule.name);
-    final author = _eval(body, rule.author);
-    final intro = _eval(body, rule.intro);
-    final coverUrl = _eval(body, rule.coverUrl);
-    final kind = _eval(body, rule.kind);
-    final wordCount = _eval(body, rule.wordCount);
-    final lastChapter = _eval(body, rule.lastChapter);
-    final tocUrl = _eval(body, rule.tocUrl);
+    // JSON 详情页的 init 语义兜底：
+    // legado 书源里 ruleBookInfo 常带 `init: $.data`，表示把 `data` 字段
+    // 解包为后续规则的上下文。我们没在 model 里建模 init 字段，这里做
+    // 启发式兜底——如果用完整 body 拿不到 name/author，且 body 是 JSON
+    // 且含 `data`/`result` 这类 Map 包装字段，就用包装字段的内容重试。
+    var ctx = body;
+    final name0 = _eval(ctx, rule.name);
+    final author0 = _eval(ctx, rule.author);
+    if ((name0 == null || name0.isEmpty) &&
+        (author0 == null || author0.isEmpty)) {
+      final unwrapped = _unwrapJsonBody(body);
+      if (unwrapped != null) ctx = unwrapped;
+    }
+
+    final name = name0 ?? _eval(ctx, rule.name);
+    final author = author0 ?? _eval(ctx, rule.author);
+    final intro = _eval(ctx, rule.intro);
+    final coverUrl = _eval(ctx, rule.coverUrl);
+    final kind = _eval(ctx, rule.kind);
+    final wordCount = _eval(ctx, rule.wordCount);
+    final lastChapter = _eval(ctx, rule.lastChapter);
+    final tocUrl = _eval(ctx, rule.tocUrl);
 
     final absoluteCoverUrl =
         coverUrl == null ? null : _resolveUrl(coverUrl, source.bookSourceUrl);
@@ -62,6 +78,30 @@ class BookInfoFetcher {
       lastChapter: lastChapter?.trim(),
       tocUrl: absoluteTocUrl ?? bookUrl,
     );
+  }
+
+  /// 尝试把 JSON 响应的包装字段（`data` / `result`）解包为内层对象。
+  ///
+  /// 用于模拟 legado `init: $.data` 语义：很多 JSON API 返回
+  /// `{"code":200,"data":{...实际字段...}}`，而书源规则是 `$.title` 而非
+  /// `$.data.title`。解包后规则的根就变成了 `data` 对象。
+  ///
+  /// 仅当 `data`/`result` 是 Map 时才解包；是 List 时由 chapterList 处理。
+  /// 非 JSON 或无包装字段时返回 null。
+  String? _unwrapJsonBody(String body) {
+    final trimmed = body.trim();
+    if (!trimmed.startsWith('{')) return null;
+    try {
+      final root = jsonDecode(trimmed);
+      if (root is! Map) return null;
+      for (final key in const ['data', 'result']) {
+        final v = root[key];
+        if (v is Map<String, dynamic>) {
+          return jsonEncode(v);
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   String? _eval(String html, String? rule) {

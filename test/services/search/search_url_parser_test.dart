@@ -3,14 +3,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('SearchUrlParser.parse - 纯 URL', () {
-    test('GET URL with {{key}} substitution', () {
+    test('GET URL with {{key}} substitution (关键字编码)', () {
       final config = SearchUrlParser.parse(
         'https://example.com/search?q={{key}}',
         keyword: '三体',
         page: 1,
       );
       expect(config, isNotNull);
-      expect(config!.url, 'https://example.com/search?q=三体');
+      // URL 上下文下 {{key}} 会被 URL 编码
+      expect(config!.url, 'https://example.com/search?q=%E4%B8%89%E4%BD%93');
       expect(config.method, 'GET');
       expect(config.body, isNull);
     });
@@ -27,6 +28,43 @@ void main() {
     test('returns null for empty input', () {
       expect(SearchUrlParser.parse('', keyword: 'x'), isNull);
       expect(SearchUrlParser.parse('   ', keyword: 'x'), isNull);
+    });
+
+    test('相对 URL + baseUrl → 拼接为绝对 URL', () {
+      // 铅笔小说风格：searchUrl 是相对路径
+      final config = SearchUrlParser.parse(
+        '/search.html?searchkey={{key}}',
+        keyword: '三体',
+        page: 1,
+        baseUrl: 'https://www.23qb.com',
+      );
+      expect(config, isNotNull);
+      expect(config!.url,
+          'https://www.23qb.com/search.html?searchkey=%E4%B8%89%E4%BD%93');
+      expect(config.method, 'GET');
+    });
+
+    test('相对 URL 无 baseUrl → 保持相对', () {
+      final config = SearchUrlParser.parse(
+        '/search?q={{key}}',
+        keyword: 'test',
+        page: 1,
+      );
+      expect(config, isNotNull);
+      // 无 baseUrl 无法拼接，保持原样（关键字仍编码）
+      expect(config!.url, '/search?q=test');
+    });
+
+    test('协议相对 URL (//host/path) + baseUrl → 补 https:', () {
+      final config = SearchUrlParser.parse(
+        '//api.example.com/search?q={{key}}',
+        keyword: '三体',
+        page: 1,
+        baseUrl: 'https://www.23qb.com',
+      );
+      expect(config, isNotNull);
+      expect(config!.url,
+          'https://api.example.com/search?q=%E4%B8%89%E4%BD%93');
     });
   });
 
@@ -65,13 +103,14 @@ void main() {
       expect(config, isNotNull);
       expect(config!.url, 'https://m.example.com/search.php');
       expect(config.method, 'POST');
+      // body 中的 {{key}} 不编码（非 URL 上下文，是 POST body）
       expect(config.body, 'keyword=三体');
     });
 
-    test('模式 B 支持 single quotes', () {
+    test('模式 B 支持 single quotes (URL 中的 {{key}} 编码)', () {
       final raw = """@js:url='https://m.example.com/search?q={{key}}';result=url;""";
       final config = SearchUrlParser.parse(raw, keyword: '三体');
-      expect(config!.url, 'https://m.example.com/search?q=三体');
+      expect(config!.url, 'https://m.example.com/search?q=%E4%B8%89%E4%BD%93');
       expect(config.method, 'GET');
     });
 
@@ -84,7 +123,7 @@ void main() {
         baseUrl: 'https://www.example.com',
       );
       expect(config, isNotNull);
-      expect(config!.url, 'https://www.example.com/so/三体.html');
+      expect(config!.url, 'https://www.example.com/so/%E4%B8%89%E4%BD%93.html');
       expect(config.method, 'GET');
       expect(config.headers, isNotNull);
       expect(config.headers!['Referer'], 'https://www.example.com/');
@@ -121,7 +160,7 @@ result = getUrl(key);
         baseUrl: 'https://www.example.com',
       );
       expect(config, isNotNull);
-      expect(config!.url, 'https://www.example.com/search/三体/1.html');
+      expect(config!.url, 'https://www.example.com/search/%E4%B8%89%E4%BD%93/1.html');
       expect(config.method, 'GET');
     });
 
@@ -135,6 +174,7 @@ result = getUrl(key);
       );
       expect(config!.url, 'https://www.example.com/search');
       expect(config.method, 'POST');
+      // body 中的 {{key}} 不编码（POST body 上下文）
       expect(config.body, 'q=三体');
     });
 

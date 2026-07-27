@@ -49,7 +49,7 @@ class SearchUrlParser {
     final jsonMatch = RegExp(r",\s*(\{.*\})\s*$").firstMatch(raw);
     if (jsonMatch == null) {
       // 纯 URL，GET 请求
-      final url = ctx.substitute(raw);
+      final url = _resolveUrl(ctx.substitute(raw), baseUrl);
       return RequestConfig(url: url, method: 'GET');
     }
 
@@ -67,12 +67,33 @@ class SearchUrlParser {
     }
 
     if (config == null) {
-      final url = ctx.substitute(raw);
+      final url = _resolveUrl(ctx.substitute(raw), baseUrl);
       return RequestConfig(url: url, method: 'GET');
     }
 
-    final url = ctx.substitute(urlPart);
+    final url = _resolveUrl(ctx.substitute(urlPart), baseUrl);
     return _buildFromConfig(url, config, ctx);
+  }
+
+  /// 把相对 URL 解析为绝对 URL。
+  ///
+  /// legado 书源的 searchUrl 经常是相对路径（如 `/search.html?q={{key}}`），
+  /// 需要拼到 `baseUrl`（书源 bookSourceUrl）上才能请求。
+  /// - 已经是绝对 URL（http/https 开头）→ 原样返回
+  /// - `//host/path` → 补 https:
+  /// - `/path` 或 `path` → 用 [Uri.resolve] 拼到 baseUrl
+  static String _resolveUrl(String url, String? baseUrl) {
+    final trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    if (baseUrl == null || baseUrl.isEmpty) return trimmed;
+    if (trimmed.startsWith('//')) return 'https:$trimmed';
+    try {
+      return Uri.parse(baseUrl).resolve(trimmed).toString();
+    } catch (_) {
+      return trimmed;
+    }
   }
 
   /// 解析 `@js:` / `<js>` 形式的 searchUrl。

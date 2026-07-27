@@ -28,11 +28,17 @@ class ReaderArgs {
   /// 元素为各源的最小 [BookInfo]（至少含 url/sourceUrl/sourceName）。
   final List<BookInfo> alternatives;
 
+  /// 进入阅读器后是否自动启动 TTS 朗读。
+  ///
+  /// 用于「听书」入口对文本源走 TTS 而非音频播放器的场景。
+  final bool autoStartTts;
+
   const ReaderArgs({
     required this.book,
     required this.chapters,
     required this.initialIndex,
     this.alternatives = const [],
+    this.autoStartTts = false,
   });
 }
 
@@ -61,6 +67,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
 
   /// 标记本次切换提示是否已被用户处理（避免重复弹窗）。
   bool _switchPromptedForCurrent = false;
+
+  /// 标记 autoStartTts 是否已触发过（只在首次加载完成后触发一次）。
+  bool _autoTtsTriggered = false;
 
   /// 滚动控制器（用于恢复阅读位置）。
   final _scrollController = ScrollController();
@@ -220,6 +229,19 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
       });
       // 切换章节时停止 TTS
       _stopTts();
+      // 首次加载且 autoStartTts=true 时，自动启动朗读
+      if (widget.args.autoStartTts && !_autoTtsTriggered) {
+        _autoTtsTriggered = true;
+        if (_content != null && _content!.trim().isNotEmpty) {
+          final tts = ref.read(ttsServiceProvider);
+          final prefs = ref.read(readingPrefsProvider);
+          tts.speak(
+            _content!,
+            rate: prefs.ttsRate,
+            pitch: prefs.ttsPitch,
+          );
+        }
+      }
       // 滚到顶部
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(0);
