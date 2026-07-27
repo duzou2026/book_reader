@@ -99,7 +99,7 @@ class FlutterTtsService implements TtsService {
     _currentRate = rate;
     _currentPitch = pitch;
 
-    Future<void> () async {
+    unawaited(() async {
       try {
         await _tts.stop();
         await _tts.setSpeechRate(_normalizeRate(rate));
@@ -113,18 +113,18 @@ class FlutterTtsService implements TtsService {
         _setState(TtsPlayState.stopped);
         onError?.call('朗读异常: $e');
       }
-    }();
+    }());
   }
 
   @override
   void pause() {
     if (_state != TtsPlayState.speaking) return;
-    Future<void> () async {
+    unawaited(() async {
       try {
         await _tts.pause();
         _setState(TtsPlayState.paused);
       } catch (_) {}
-    }();
+    }());
   }
 
   @override
@@ -140,13 +140,13 @@ class FlutterTtsService implements TtsService {
 
   @override
   void stop() {
-    Future<void> () async {
+    unawaited(() async {
       try {
         await _tts.stop();
       } catch (_) {}
       _currentText = '';
       _setState(TtsPlayState.stopped);
-    }();
+    }());
   }
 
   @override

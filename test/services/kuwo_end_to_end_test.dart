@@ -93,7 +93,7 @@ void main() {
   });
 
   group('酷我小说端到端（真实 API 响应）', () {
-    test('搜索：{{$.book_id}} 模板替换 → 拿到 bookUrl', () async {
+    test('搜索：{{\$.book_id}} 模板替换 → 拿到 bookUrl', () async {
       final fetcher = _FakeFetcher({
         'http://appi.kuwo.cn/novels/api/book/search?keyword=%E4%B8%89%E4%BD%93&pi=1&ps=30':
             searchResponse,
@@ -153,7 +153,7 @@ void main() {
           'http://appi.kuwo.cn/novels/api/book/21041885901615104/chapters/56506348015685049');
     });
 
-    test('正文：$.data.content JSONPath 提取', () async {
+    test('正文：\$.data.content JSONPath 提取', () async {
       final fetcher = _FakeFetcher({
         'http://appi.kuwo.cn/novels/api/book/21041885901615104/chapters/56483893775675668':
             contentResponse,
