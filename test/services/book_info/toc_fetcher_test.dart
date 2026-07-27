@@ -169,7 +169,7 @@ void main() {
     /// 模拟酷我小说 / 熊猫看书：目录页返回 JSON，
     /// chapterList 是 JSONPath（如 $.data 或 $.result.pageList），
     /// chapterName/chapterUrl 也是作用于每个章节对象的 JSONPath。
-    test('parses JSON chapterList ($.data) with JSONPath fields', () async {
+    test(r'parses JSON chapterList ($.data) with JSONPath fields', () async {
       const jsonBody = '''
       {"data":[
         {"name":"第一章 醒来","url":"/chapter/1","isVip":"false"},
@@ -205,7 +205,7 @@ void main() {
       expect(chapters[2].index, 3);
     });
 
-    test('parses nested JSON chapterList ($.result.pageList)', () async {
+    test(r'parses nested JSON chapterList ($.result.pageList)', () async {
       // 熊猫看书风格：目录嵌在 result.pageList
       const jsonBody = '''
       {"code":0,"result":{"pageList":[

@@ -58,9 +58,10 @@ void main() {
       final sourceA = makeSource('源A', 'https://a.com');
       final sourceB = makeSource('源B', 'https://b.com');
 
+      // 用空关键字避免 SingleSourceSearcher 的相关性过滤干扰聚合逻辑测试
       final fetcher = _FakeFetcher({
-        'https://a.com/search?q=x': htmlFor('三体', '刘慈欣', '/book/1'),
-        'https://b.com/search?q=x': htmlFor('三体', '刘慈欣', '/book/9'),
+        'https://a.com/search?q=': htmlFor('三体', '刘慈欣', '/book/1'),
+        'https://b.com/search?q=': htmlFor('三体', '刘慈欣', '/book/9'),
       });
 
       final searcher = SingleSourceSearcher(
@@ -69,7 +70,7 @@ void main() {
       );
       final aggregator = SearchAggregator(searcher: searcher);
 
-      final results = await aggregator.search('x', [sourceA, sourceB]);
+      final results = await aggregator.search('', [sourceA, sourceB]);
 
       expect(results.length, 1);
       expect(results[0].bookName, '三体');
@@ -83,8 +84,8 @@ void main() {
       final sourceB = makeSource('源B', 'https://b.com');
 
       final fetcher = _FakeFetcher({
-        'https://a.com/search?q=x': htmlFor('三体', '刘慈欣', '/1'),
-        'https://b.com/search?q=x': htmlFor('  三体  ', ' 刘慈欣 ', '/2'),
+        'https://a.com/search?q=': htmlFor('三体', '刘慈欣', '/1'),
+        'https://b.com/search?q=': htmlFor('  三体  ', ' 刘慈欣 ', '/2'),
       });
 
       final searcher = SingleSourceSearcher(
@@ -93,7 +94,7 @@ void main() {
       );
       final aggregator = SearchAggregator(searcher: searcher);
 
-      final results = await aggregator.search('x', [sourceA, sourceB]);
+      final results = await aggregator.search('', [sourceA, sourceB]);
       expect(results.length, 1);
       expect(results[0].sources.length, 2);
     });
@@ -101,7 +102,7 @@ void main() {
     test('keeps separate entries for different books', () async {
       final sourceA = makeSource('源A', 'https://a.com');
       final fetcher = _FakeFetcher({
-        'https://a.com/search?q=x': '''
+        'https://a.com/search?q=': '''
         <ul class="book-list">
           <li><a href="/1" class="title">三体</a><span class="author">刘慈欣</span></li>
           <li><a href="/2" class="title">活着</a><span class="author">余华</span></li>
@@ -115,7 +116,7 @@ void main() {
       );
       final aggregator = SearchAggregator(searcher: searcher);
 
-      final results = await aggregator.search('x', [sourceA]);
+      final results = await aggregator.search('', [sourceA]);
       expect(results.length, 2);
     });
 
@@ -125,7 +126,7 @@ void main() {
 
       // 只配置 A 的响应，B 会抛异常
       final fetcher = _FakeFetcher({
-        'https://a.com/search?q=x': htmlFor('三体', '刘慈欣', '/1'),
+        'https://a.com/search?q=': htmlFor('三体', '刘慈欣', '/1'),
       });
 
       final searcher = SingleSourceSearcher(
@@ -134,7 +135,7 @@ void main() {
       );
       final aggregator = SearchAggregator(searcher: searcher);
 
-      final results = await aggregator.search('x', [sourceA, sourceB]);
+      final results = await aggregator.search('', [sourceA, sourceB]);
       expect(results.length, 1);
       expect(results[0].bookName, '三体');
       expect(results[0].sources.length, 1);
@@ -151,7 +152,7 @@ void main() {
       );
       final aggregator = SearchAggregator(searcher: searcher);
 
-      final results = await aggregator.search('x', [sourceA]);
+      final results = await aggregator.search('', [sourceA]);
       expect(results, isEmpty);
     });
 
@@ -161,7 +162,7 @@ void main() {
         ruleEngine: engine,
       );
       final aggregator = SearchAggregator(searcher: searcher);
-      final results = await aggregator.search('x', const []);
+      final results = await aggregator.search('', const []);
       expect(results, isEmpty);
     });
 
@@ -172,9 +173,9 @@ void main() {
 
       // 三体在 3 个源都有；活着只在 1 个源有
       final fetcher = _FakeFetcher({
-        'https://a.com/search?q=x': htmlFor('三体', '刘', '/1'),
-        'https://b.com/search?q=x': htmlFor('三体', '刘', '/2'),
-        'https://c.com/search?q=x': '''
+        'https://a.com/search?q=': htmlFor('三体', '刘', '/1'),
+        'https://b.com/search?q=': htmlFor('三体', '刘', '/2'),
+        'https://c.com/search?q=': '''
           <ul class="book-list">
             <li><a href="/3" class="title">三体</a><span class="author">刘</span></li>
             <li><a href="/4" class="title">活着</a><span class="author">余</span></li>
@@ -188,7 +189,7 @@ void main() {
       );
       final aggregator = SearchAggregator(searcher: searcher);
 
-      final results = await aggregator.search('x', [sourceA, sourceB, sourceC]);
+      final results = await aggregator.search('', [sourceA, sourceB, sourceC]);
       expect(results.length, 2);
       expect(results[0].bookName, '三体');
       expect(results[0].sources.length, 3);
