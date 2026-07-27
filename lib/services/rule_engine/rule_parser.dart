@@ -88,17 +88,39 @@ class RuleParser {
   ///
   /// CSS 选择器的关键特征：
   ///   - 含 `.` / `#` / `>` / `+` / `~` 等组合符
-  ///   - **不含 `@`**（legado 用 @ 作步骤分隔符，CSS 选择器不会用到）
   ///   - **不含 `!N` 末尾索引**（legado 的索引语法）
+  ///
+  /// 关于 `@`：单个 `@` 后接属性名是 CSS 属性提取器（如 `.foo@text` / `#bar@href`），
+  /// 多个 `@` 步骤链（如 `#a@tbody@tr!0`）已由 [LegadoRuleParser.isLegadoRule]
+  /// 在 [detect] 中先行拦截，不会走到这里。
   bool _looksLikeCss(String s) {
-    // 含 @ → legado 步骤分隔符，不是 CSS
-    if (s.contains('@')) return false;
     // 末尾的 !N → legado 索引语法
     if (RegExp(r'!\d+$').hasMatch(s)) return false;
+
+    // 含 @ ：单 @ + CSS 选择器前缀 → CSS 属性提取器（如 .foo@text / #bar@href）
+    // 多 @ 已由 isLegadoRule 拦截，这里只会收到 0 或 1 个 @ 的规则。
+    final atIdx = s.indexOf('@');
+    if (atIdx >= 0) {
+      return _selectorLooksLikeCss(s.substring(0, atIdx));
+    }
+
+    // 无 @ ：检查是否含 CSS 组合符/前缀
     final cssHints = ['.', '#', '>', ' + ', ' ~ '];
     for (final h in cssHints) {
       if (s.contains(h)) return true;
     }
+    return false;
+  }
+
+  /// 判断 `@` 之前的部分是否是 CSS 选择器。
+  bool _selectorLooksLikeCss(String s) {
+    if (s.isEmpty) return false;
+    // .class / #id 简写
+    if (s.startsWith('.') || s.startsWith('#')) return true;
+    // 含组合符
+    if (s.contains('>') || s.contains(' + ') || s.contains(' ~ ')) return true;
+    // 标签名 + class/id（如 div.foo / a#bar）
+    if (RegExp(r'^[A-Za-z][A-Za-z0-9]*[.#]').hasMatch(s)) return true;
     return false;
   }
 }

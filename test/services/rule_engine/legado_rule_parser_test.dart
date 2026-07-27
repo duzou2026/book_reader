@@ -59,16 +59,18 @@ void main() {
     });
 
     test('class.xxx.N@index 形式', () {
+      // class.xxx.N 语义：第 N 个匹配 class=xxx 的元素（N 从 0 开始）。
       const listHtml = '''
       <ul class="list">
-        <li>第一</li>
-        <li>第二</li>
-        <li>第三</li>
+        <li class="item">第一</li>
+        <li class="item">第二</li>
+        <li class="item">第三</li>
       </ul>
       ''';
       final parser = LegadoRuleParser();
-      expect(parser.queryFirst(listHtml, 'class.list.0@text'), '第一');
-      expect(parser.queryFirst(listHtml, 'class.list.1@text'), '第二');
+      expect(parser.queryFirst(listHtml, 'class.item.0@text'), '第一');
+      expect(parser.queryFirst(listHtml, 'class.item.1@text'), '第二');
+      expect(parser.queryFirst(listHtml, 'class.item.2@text'), '第三');
     });
   });
 

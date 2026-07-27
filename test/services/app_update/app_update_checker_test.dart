@@ -168,6 +168,8 @@ Map<String, dynamic> _sampleReleasePayload({
     'name': 'Release 0.3.0',
     'body': '## What\'s new\n- fix bug A\n- add feature B',
     'published_at': '2026-07-25T10:00:00Z',
+    // Gitee Releases API 用 created_at 字段；检查器优先走 Gitee，payload 需带上。
+    'created_at': '2026-07-25T10:00:00Z',
     'html_url': 'https://github.com/duzou2026/book_reader/releases/tag/$tagName',
     'assets': <Map<String, dynamic>>[
       {

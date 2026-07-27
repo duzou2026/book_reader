@@ -82,6 +82,9 @@ class LegadoRuleParser {
     }
     // 1. 含 legado 旧式类型前缀：class. / tag. / id. / children.
     if (RegExp(r'^(class|tag|id|children)\.').hasMatch(r)) return true;
+    // bare `children`（无后续 .name）也是 legado 旧式语法，表示取直接子元素。
+    // _parseStep 已支持把 bare `children` 解析为取子元素列表的步骤。
+    if (r == 'children') return true;
     // 2. 含 !N 末尾索引 → legado 索引语法
     if (RegExp(r'!\d+').hasMatch(r)) return true;
     // 3. 含 @ 步骤分隔符

@@ -63,7 +63,18 @@ class SearchUrlParser {
         config = decoded;
       }
     } catch (_) {
-      // JSON 解析失败，退化为纯 URL
+      // 标准双引号 JSON 解析失败，尝试 legado 书源常见的单引号 JSON：
+      // legado 配置段习惯用单引号（如 {'method':'POST','body':'k={{key}}'}），
+      // 标准 jsonDecode 不接受单引号，这里把单引号转双引号后重试。
+      try {
+        final normalized = jsonPart.replaceAll("'", '"');
+        final decoded = jsonDecode(normalized);
+        if (decoded is Map<String, dynamic>) {
+          config = decoded;
+        }
+      } catch (_) {
+        // 单引号 JSON 也解析失败，退化为纯 URL
+      }
     }
 
     if (config == null) {
