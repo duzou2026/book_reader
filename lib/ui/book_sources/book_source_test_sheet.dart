@@ -54,8 +54,26 @@ class _BookSourceTestSheetState extends ConsumerState<BookSourceTestSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // 三态判定：通过(绿) / 部分通过(黄) / 存在问题(红)
+    final hasFail = _steps.any((s) => s.status == TestStepStatus.fail);
+    final hasSkip = _steps.any((s) => s.status == TestStepStatus.skip);
     final allOk = _done && _steps.isNotEmpty && _steps.every((s) => s.ok);
-    final hasFail = _steps.any((s) => !s.ok);
+    // 综合状态：有失败=存在问题, 有跳过无失败=部分通过, 全通过=通过
+    final statusLabel = allOk
+        ? '通过'
+        : (hasFail ? '存在问题' : (hasSkip ? '部分通过' : '存在问题'));
+    final statusColor = allOk
+        ? ThemeColors.successText(context)
+        : (hasFail ? ThemeColors.errorText(context) : Colors.orange.shade700);
+    final statusBg = allOk
+        ? ThemeColors.successContainer(context)
+        : (hasFail
+            ? Colors.red.shade50
+            : Colors.orange.shade50);
+    final statusIcon = allOk
+        ? Icons.check_circle
+        : (hasFail ? Icons.error_outline : Icons.info_outline);
+
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
@@ -87,18 +105,14 @@ class _BookSourceTestSheetState extends ConsumerState<BookSourceTestSheet> {
               ),
               if (_done)
                 Chip(
-                  label: Text(allOk ? '通过' : '存在问题',
+                  label: Text(statusLabel,
                       style: const TextStyle(fontSize: 12)),
-                  backgroundColor: allOk
-                      ? ThemeColors.successContainer(context)
-                      : (hasFail ? Colors.orange.shade50 : ThemeColors.surfaceLevel1(context)),
+                  backgroundColor: statusBg,
                   side: BorderSide.none,
                   avatar: Icon(
-                    allOk ? Icons.check_circle : Icons.warning_amber,
+                    statusIcon,
                     size: 18,
-                    color: allOk
-                        ? ThemeColors.successText(context)
-                        : Colors.orange.shade700,
+                    color: statusColor,
                   ),
                 ),
             ],
@@ -164,11 +178,15 @@ class _BookSourceTestSheetState extends ConsumerState<BookSourceTestSheet> {
         }
         continue;
       }
+      final s = step.last;
+      final state = s.ok
+          ? _StepState.ok
+          : (s.status == TestStepStatus.skip ? _StepState.skip : _StepState.fail);
       rows.add(_buildStepRow(
         name: name,
-        state: step.last.ok ? _StepState.ok : _StepState.fail,
-        message: step.last.message,
-        elapsedMs: step.last.elapsedMs,
+        state: state,
+        message: s.message,
+        elapsedMs: s.elapsedMs,
       ));
     }
     return rows;
@@ -204,6 +222,11 @@ class _BookSourceTestSheetState extends ConsumerState<BookSourceTestSheet> {
           ThemeColors.successText(context),
           elapsedMs == null ? '通过' : '${elapsedMs}ms',
           Icon(Icons.check_circle, size: 16, color: ThemeColors.successText(context)),
+        ),
+      _StepState.skip => (
+          ThemeColors.mutedText(context),
+          '跳过',
+          Icon(Icons.remove_circle_outline, size: 16, color: ThemeColors.mutedText(context)),
         ),
       _StepState.fail => (
           ThemeColors.errorText(context),
@@ -242,13 +265,20 @@ class _BookSourceTestSheetState extends ConsumerState<BookSourceTestSheet> {
   String _summarize() {
     if (_steps.isEmpty) return '';
     final okCount = _steps.where((s) => s.ok).length;
+    final skipCount = _steps.where((s) => s.status == TestStepStatus.skip).length;
+    final failCount = _steps.where((s) => s.status == TestStepStatus.fail).length;
     final total = _steps.length;
     final totalMs = _steps.fold<int>(0, (s, e) => s + e.elapsedMs);
     if (okCount == total) {
       return '全部通过 · 共 $total 步 · 耗时 ${totalMs}ms';
     }
-    return '$okCount/$total 步通过 · 失败步骤：${_steps.where((s) => !s.ok).map((s) => s.name).join('、')}';
+    final parts = <String>['$okCount 步通过'];
+    if (skipCount > 0) parts.add('$skipCount 步跳过');
+    if (failCount > 0) {
+      parts.add('$failCount 步失败：${_steps.where((s) => s.status == TestStepStatus.fail).map((s) => s.name).join('、')}');
+    }
+    return '${parts.join(' · ')} · 耗时 ${totalMs}ms';
   }
 }
 
-enum _StepState { pending, running, ok, fail }
+enum _StepState { pending, running, ok, skip, fail }

@@ -57,11 +57,29 @@ class SingleSourceSearcher {
       return [];
     }
 
+    // 反爬验证页检测：部分站点（如起点）对无 Cookie 请求返回 JS 验证页，
+    // 特征是 HTTP 202 + 短响应 + 含 'var buid' 等验证标识。
+    // 这种情况下搜索结果必然为空，直接返回避免浪费后续解析时间。
+    if (_isAntiCrawlPage(body)) {
+      return [];
+    }
+
     final bookListRule = rule.bookList;
     if (bookListRule == null) return [];
 
     // bookList 规则：可能是 CSS / legado 旧式 / XPath / JSON
-    final elements = ruleEngine.evalElements(body, bookListRule);
+    var elements = ruleEngine.evalElements(body, bookListRule);
+
+    // <js> bookList fallback：当 bookList 是 <js> 规则且返回空时，
+    // 尝试从 JS 代码中提取 CSS 选择器（如 path='class.res-book-item'），
+    // 用它直接从 body 提取元素。很多书源的 <js> bookList 只是包装了
+    // 一个 CSS 选择器 + 人机验证逻辑，我们跳过验证逻辑，直接用选择器提取。
+    if (elements.isEmpty && _isJsBookListRule(bookListRule)) {
+      final fallbackSelector = _extractCssFromJsBookList(bookListRule);
+      if (fallbackSelector != null) {
+        elements = ruleEngine.evalElements(body, fallbackSelector);
+      }
+    }
 
     // JSON 规则的特殊处理：evalElements 对 JSON 返回空，
     // 需要用 evalList 拿字符串列表，再构造结果
@@ -282,5 +300,50 @@ class SingleSourceSearcher {
     } catch (_) {
       return trimmed;
     }
+  }
+
+  /// 检测响应是否为反爬验证页。
+  ///
+  /// 特征：短响应（<2KB）+ 含 JS 验证标识（'var buid' / 'verify' / 'blocked'）。
+  /// 起点等站点对无 Cookie 请求返回 HTTP 202 + 209 字节的 JS 验证页，
+  /// 而非真正的搜索结果 HTML。
+  static final _antiCrawlPatterns = [
+    RegExp(r'var\s+buid'),
+    RegExp(r'<title>\s*(验证|blocked|verify|安全验证)', caseSensitive: false),
+  ];
+
+  bool _isAntiCrawlPage(String body) {
+    // 反爬验证页通常很短（< 2KB），真搜索结果一般 > 10KB
+    if (body.length > 2048) return false;
+    for (final p in _antiCrawlPatterns) {
+      if (p.hasMatch(body)) return true;
+    }
+    return false;
+  }
+
+  /// 判断 bookList 规则是否为 `<js>` 规则。
+  bool _isJsBookListRule(String rule) {
+    final trimmed = rule.trim();
+    return trimmed.startsWith('<js>') || trimmed.startsWith('@js:');
+  }
+
+  /// 从 `<js>` bookList 规则中提取 CSS 选择器作为 fallback。
+  ///
+  /// 很多书源的 `<js>` bookList 只是包装了一个 CSS 选择器 + 人机验证逻辑，
+  /// 例如起点的规则：
+  /// ```js
+  /// <js>
+  /// path='class.res-book-item';
+  /// u=java.get('url');
+  /// c=java.getElement(path);
+  /// ...
+  /// </js>
+  /// ```
+  /// 这里提取 `path='...'` 中的选择器，跳过人机验证逻辑直接用它提取元素。
+  static final _pathVarPattern = RegExp(r'''path\s*=\s*['"]([^'"]+)['"]''');
+
+  String? _extractCssFromJsBookList(String rule) {
+    final match = _pathVarPattern.firstMatch(rule);
+    return match?.group(1);
   }
 }
