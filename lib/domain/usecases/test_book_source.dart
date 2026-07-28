@@ -1,5 +1,6 @@
 import 'package:book_reader/data/models/book_info.dart';
 import 'package:book_reader/data/models/book_source.dart';
+import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/services/book_info/book_info_fetcher.dart';
 import 'package:book_reader/services/book_info/content_fetcher.dart';
 import 'package:book_reader/services/book_info/toc_fetcher.dart';
@@ -112,7 +113,7 @@ class TestBookSource {
 
     // 步骤 1：搜索
     // 搜索无结果不算失败（书源可能就是没收录这本书），标记为 skip 并终止后续步骤。
-    final searchResult = await _runStep(
+    final searchResult = await _runStep<SearchResult>(
       name: '搜索',
       steps: steps,
       onStep: onStep,
