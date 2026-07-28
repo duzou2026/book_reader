@@ -42,15 +42,21 @@ class JsExecutor {
     // 返回空字符串/空数组；编码/时间格式化等纯函数可正常工作。
     setup.writeln(_javaStub);
 
-    _rt.evaluate(setup.toString());
-    final res = _rt.evaluate(expr);
-    final raw = res.stringResult;
+    try {
+      _rt.evaluate(setup.toString());
+      final res = _rt.evaluate(expr);
+      final raw = res.stringResult;
 
-    // flutter_js 对 string 结果会带引号，这里去一层
-    if (raw.startsWith('"') && raw.endsWith('"')) {
-      return _unesquote(raw.substring(1, raw.length - 1));
+      // flutter_js 对 string 结果会带引号，这里去一层
+      if (raw.startsWith('"') && raw.endsWith('"')) {
+        return _unesquote(raw.substring(1, raw.length - 1));
+      }
+      return raw;
+    } catch (_) {
+      // JS 执行失败（语法错误 / 运行时错误 / native FFI 异常）
+      // 返回 null 让 RuleEngine 回退到下一个备选规则
+      return null;
     }
-    return raw;
   }
 
   /// java 兼容桩 JS 代码。

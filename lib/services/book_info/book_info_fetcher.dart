@@ -65,19 +65,45 @@ class BookInfoFetcher {
     final absoluteTocUrl =
         tocUrl == null ? null : _resolveUrl(tocUrl, source.bookSourceUrl);
 
+    // 字段清洗：剥离规则残留（@js: 规则文本、$1 占位符、<js> 标签等）。
+    // 书源规则执行失败或 legado @js: 后缀未支持时，
+    // 规则字符串可能泄露到字段值里，这里做兜底清洗。
     return BookInfo(
       url: bookUrl,
       sourceName: source.bookSourceName,
       sourceUrl: source.bookSourceUrl,
-      name: name?.trim(),
-      author: author?.trim(),
-      intro: intro?.trim(),
+      name: _cleanField(name),
+      author: _cleanField(author),
+      intro: _cleanField(intro),
       coverUrl: absoluteCoverUrl,
-      kind: kind?.trim(),
-      wordCount: wordCount?.trim(),
-      lastChapter: lastChapter?.trim(),
+      kind: _cleanField(kind),
+      wordCount: _cleanField(wordCount),
+      lastChapter: _cleanField(lastChapter),
       tocUrl: absoluteTocUrl ?? bookUrl,
     );
+  }
+
+  /// 清洗字段值：剥离规则残留和未展开占位符。
+  ///
+  /// 处理内容：
+  ///   - `@js:...` / `@get:...` / `@put:...` / `@post:...` 规则文本
+  ///   - `<js>...</js>` 块
+  ///   - `$1`、`$2` 等未展开的捕获组占位符
+  ///   - 合并多余空行、首尾空白
+  /// 清洗后为空则返回 null。
+  String? _cleanField(String? value) {
+    if (value == null) return null;
+    var s = value;
+    // 剥离 @js: / @get: / @put: / @post: 规则文本（到行尾）
+    s = s.replaceAll(RegExp(r'@(?:js|get|put|post):[^\n]*'), '');
+    // 剥离 <js>...</js> 块
+    s = s.replaceAll(RegExp(r'<js>.*?</js>', dotAll: true), '');
+    // 剥离未展开的 $1 / $2 等占位符
+    s = s.replaceAll(RegExp(r'\$\d+'), '');
+    // 合并多余空行
+    s = s.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+    s = s.trim();
+    return s.isEmpty ? null : s;
   }
 
   /// 尝试把 JSON 响应的包装字段（`data` / `result`）解包为内层对象。

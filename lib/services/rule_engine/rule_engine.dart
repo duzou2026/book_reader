@@ -344,6 +344,10 @@ class RuleEngine {
   /// 格式：`regex##replacement`，其中 replacement 可省略（默认空字符串）。
   /// 多条规则用 `||` 分隔。
   /// 替换串中可引用捕获组：`$1`、`$2`、`$<name>`。
+  ///
+  /// 注意：Dart `String.replaceAll(RegExp, String)` 在正则**无捕获组**但
+  /// replacement 含 `$1` 时会原样保留 `$1`，导致占位符泄露到结果里。
+  /// 这里改用 `replaceAllMapped` 手动展开捕获组引用，无对应组时替换为空。
   String _applyPurify(String input, String purifyRule) {
     var result = input;
     // 支持 || 分隔多条净化规则
@@ -355,11 +359,53 @@ class RuleEngine {
       final replacement = segs.length > 1 ? segs[1] : '';
       if (pattern.isEmpty) continue;
       try {
-        result = result.replaceAll(RegExp(pattern), replacement);
+        final regExp = RegExp(pattern);
+        if (replacement.contains('\$')) {
+          // 含 $ 引用时手动展开，避免无捕获组时 $1 泄露
+          result = result.replaceAllMapped(regExp,
+              (m) => _expandPurifyReplacement(replacement, m));
+        } else {
+          result = result.replaceAll(regExp, replacement);
+        }
       } catch (_) {
         // 正则语法错误时跳过
       }
     }
     return result;
+  }
+
+  /// 展开净化规则 replacement 中的 `$1`/`$2`/`${1}`/`$<name>` 引用。
+  /// 捕获组不存在时替换为空串（而非原样保留 `$1`）。
+  static final _purifyRefPattern = RegExp(r'\$(\d+|\{(\d+)\}|<([^>]+)>)');
+
+  String _expandPurifyReplacement(String replacement, RegExpMatch m) {
+    final buf = StringBuffer();
+    var lastEnd = 0;
+    for (final ref in _purifyRefPattern.allMatches(replacement)) {
+      buf.write(replacement.substring(lastEnd, ref.start));
+      final g1 = ref.group(1)!;
+      String? value;
+      if (g1.startsWith('{')) {
+        final n = int.tryParse(ref.group(2)!);
+        if (n != null) value = _safeGroup(m, n);
+      } else if (g1.startsWith('<')) {
+        value = m.namedGroup(ref.group(3)!);
+      } else {
+        final n = int.tryParse(g1);
+        if (n != null) value = _safeGroup(m, n);
+      }
+      buf.write(value ?? '');
+      lastEnd = ref.end;
+    }
+    buf.write(replacement.substring(lastEnd));
+    return buf.toString();
+  }
+
+  String? _safeGroup(RegExpMatch m, int n) {
+    try {
+      return m.group(n);
+    } catch (_) {
+      return null;
+    }
   }
 }
