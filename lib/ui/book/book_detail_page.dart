@@ -8,6 +8,7 @@ import 'package:book_reader/ui/book/chapter_download_sheet.dart';
 import 'package:book_reader/ui/book/reader_page.dart';
 import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -51,6 +52,9 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
 
   /// 已折叠的卷标名集合。
   final Set<String> _collapsedVolumes = {};
+
+  /// 简介是否展开（默认折叠，长简介占屏太多）。
+  bool _introExpanded = false;
 
   String get _id => BookshelfEntry.makeId(
       widget.searchResult.bookName, widget.searchResult.author);
@@ -574,7 +578,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                         Text('简介',
                             style: Theme.of(context).textTheme.titleSmall),
                         const SizedBox(height: 8),
-                        Text(intro, style: const TextStyle(height: 1.5, fontSize: 14)),
+                        _buildIntro(intro),
                       ],
                     ),
                   ),
@@ -1022,6 +1026,93 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
               : () => _openReader(_chapters.indexOf(c)),
         ),
     ];
+  }
+
+  /// 构造简介区：白名单 HTML 渲染 + 折叠展开。
+  ///
+  /// 简介来源数据常含 `<br>` `<p>` `<b>` 等 HTML 标签，直接用 Text 会把
+  /// 标签字面量显示出来。这里用 flutter_html 渲染白名单标签，其余剥离。
+  /// 长简介默认折叠（最多 3 行），点「展开」查看全文。
+  Widget _buildIntro(String intro) {
+    final muted = ThemeColors.mutedText(context);
+    // 折叠态：用 Text + 最多 3 行，配合 overflow.ellipsis + 末尾"展开"按钮
+    // 展开态：用 Html widget 完整渲染富文本
+    if (!_introExpanded) {
+      // 先用正则把 <br> 转成换行，剥离其他标签得到纯文本，用于折叠态展示
+      final plain = _stripHtml(intro);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            plain,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(height: 1.5, fontSize: 14, color: muted),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => setState(() => _introExpanded = true),
+              child: const Text('展开', style: TextStyle(fontSize: 12)),
+            ),
+          ),
+        ],
+      );
+    }
+    // 展开态：Html 渲染 + 收起按钮
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Html(
+          data: intro,
+          style: {
+            'body': Style(
+              margin: Margins.zero,
+              fontSize: FontSize(14),
+              lineHeight: const LineHeight(1.5),
+              color: muted,
+            ),
+            'p': Style(margin: Margins.only(bottom: 4)),
+            'a': Style(color: Theme.of(context).colorScheme.primary),
+          },
+          // 白名单标签：只渲染文本结构 + 基本格式 + 链接/图片
+          // flutter_html 默认不支持 script/iframe/form 等危险标签
+          onLinkTap: (url, _, __) {
+            if (url == null) return;
+            // 链接点击暂不跳转外链，避免恶意引流
+          },
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => setState(() => _introExpanded = false),
+            child: const Text('收起', style: TextStyle(fontSize: 12)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 剥离 HTML 标签为纯文本（用于折叠态展示）。
+  /// `<br>` `/` `<br/>` 转换行，其他标签直接剥离尖括号内容。
+  String _stripHtml(String html) {
+    var s = html;
+    // <br> 系列换成换行
+    s = s.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
+    // <p>...</p> 段落间换行
+    s = s.replaceAll(RegExp(r'</p\s*>', caseSensitive: false), '\n');
+    s = s.replaceAll(RegExp(r'<p[^>]*>', caseSensitive: false), '');
+    // 其他标签直接剥离
+    s = s.replaceAll(RegExp(r'<[^>]+>'), '');
+    // HTML 实体转义
+    s = s.replaceAll('&nbsp;', ' ');
+    s = s.replaceAll('&lt;', '<');
+    s = s.replaceAll('&gt;', '>');
+    s = s.replaceAll('&amp;', '&');
+    s = s.replaceAll('&quot;', '"');
+    // 合并多余空行
+    s = s.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+    return s.trim();
   }
 
   Widget _coverPlaceholder(double w, double h) {

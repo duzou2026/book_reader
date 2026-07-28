@@ -414,6 +414,39 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
     return '$m 分 $s 秒';
   }
 
+  /// 构造顶部「图标+文字」双标按钮。
+  ///
+  /// 纯图标在移动端 tooltip 基本无效，用户不知道每个图标代表什么。
+  /// 改为图标下方带一行小字（10sp），直接看懂功能，参考番茄/起点/Legado 做法。
+  Widget _buildActionBtn({
+    required IconData icon,
+    required String label,
+    Color? color,
+    VoidCallback? onPressed,
+  }) {
+    final fg = color ?? Theme.of(context).appBarTheme.foregroundColor ?? Theme.of(context).colorScheme.onSurface;
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 20, color: fg),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(fontSize: 10, color: fg),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// 跟随系统夜间模式：若开启且系统为深色，自动切到夜间背景。
   _Bg _resolveBackground(ReadingPrefs prefs, Brightness platformBrightness) {
     final idx = (prefs.followSystemDark && platformBrightness == Brightness.dark)
@@ -832,10 +865,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
+          tooltip: '返回',
           onPressed: () => _exit(),
         ),
         title: Text(_currentChapter.name,
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+        // 顶部 actions 改为可横向滚动的「图标+文字」双标按钮组
+        // 解决纯图标用户不知道具体功能的问题（参考番茄/起点/Legado 做法）
         actions: [
           if (isOnSwitchedSource)
             Padding(
@@ -848,61 +884,65 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
                 backgroundColor: Colors.teal.withOpacity(0.15),
               ),
             ),
-          IconButton(
-            icon: Icon(
-              _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-              color: _isBookmarked ? Colors.amber : null,
+          SizedBox(
+            // 限制高度避免 Column 撑满 AppBar，宽度自适应内容
+            height: 48,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              shrinkWrap: true,
+              children: [
+                _buildActionBtn(
+                  icon: _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                  label: _isBookmarked ? '已签' : '书签',
+                  color: _isBookmarked ? Colors.amber : null,
+                  onPressed: _loading ? null : _toggleBookmark,
+                ),
+                _buildActionBtn(
+                  icon: Icons.auto_mode,
+                  label: isAutoReading ? '停止' : '自动',
+                  color: isAutoReading ? Colors.teal : null,
+                  onPressed: _loading ? null : _toggleAutoRead,
+                ),
+                _buildActionBtn(
+                  icon: ttsIcon,
+                  label: _ttsState != TtsPlayState.stopped ? '朗读中' : '朗读',
+                  color: _ttsState != TtsPlayState.stopped ? Colors.teal : null,
+                  onPressed: _loading ? null : _toggleTts,
+                ),
+                _buildActionBtn(
+                  icon: Icons.swap_horiz,
+                  label: '换源',
+                  onPressed: _loading ? null : _manualResolve,
+                ),
+                _buildActionBtn(
+                  icon: Icons.download_for_offline,
+                  label: '下载',
+                  onPressed: _loading
+                      ? null
+                      : () => ChapterDownloadSheet.show(
+                            context,
+                            book: _currentBook,
+                            chapters: _currentChapters,
+                            currentIndex: _currentIndex,
+                          ),
+                ),
+                _buildActionBtn(
+                  icon: Icons.menu_book,
+                  label: '笔记',
+                  onPressed: _openNotesDrawer,
+                ),
+                _buildActionBtn(
+                  icon: Icons.list,
+                  label: '目录',
+                  onPressed: () => _openChapterDrawer(),
+                ),
+                _buildActionBtn(
+                  icon: Icons.tune,
+                  label: '设置',
+                  onPressed: () => _openSettingsSheet(),
+                ),
+              ],
             ),
-            tooltip: _isBookmarked ? '移除书签' : '加入书签',
-            onPressed: _loading ? null : _toggleBookmark,
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.auto_mode,
-              color: isAutoReading ? Colors.teal : null,
-            ),
-            tooltip: isAutoReading ? '停止自动阅读' : '自动阅读',
-            onPressed: _loading ? null : _toggleAutoRead,
-          ),
-          IconButton(
-            icon: Icon(
-              ttsIcon,
-              color: _ttsState != TtsPlayState.stopped ? Colors.teal : null,
-            ),
-            tooltip: 'TTS 朗读',
-            onPressed: _loading ? null : _toggleTts,
-          ),
-          IconButton(
-            icon: const Icon(Icons.swap_horiz),
-            tooltip: '换源',
-            onPressed: _loading ? null : _manualResolve,
-          ),
-          IconButton(
-            icon: const Icon(Icons.download_for_offline),
-            tooltip: '离线下载',
-            onPressed: _loading
-                ? null
-                : () => ChapterDownloadSheet.show(
-                      context,
-                      book: _currentBook,
-                      chapters: _currentChapters,
-                      currentIndex: _currentIndex,
-                    ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.menu_book),
-            tooltip: '笔记 / 书签',
-            onPressed: _openNotesDrawer,
-          ),
-          IconButton(
-            icon: const Icon(Icons.list),
-            tooltip: '目录',
-            onPressed: () => _openChapterDrawer(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.tune),
-            tooltip: '设置',
-            onPressed: () => _openSettingsSheet(),
           ),
         ],
       ),
