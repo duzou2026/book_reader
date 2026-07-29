@@ -4,8 +4,16 @@ import 'package:book_reader/services/preferences/theme_prefs_repository.dart';
 import 'package:book_reader/ui/settings/app_update_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-/// App 设置页：主题模式、主题色等全局偏好。
+/// App 设置页：统一的功能入口与全局偏好。
+///
+/// 分组：
+///   - 阅读：书源管理、发现/排行、阅读历史
+///   - 外观：主题模式、主题色
+///   - 数据：备份与恢复
+///   - 更新：检查更新
+///   - 关于：版本、开源协议
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
@@ -17,6 +25,29 @@ class SettingsPage extends ConsumerWidget {
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
         children: [
+          _SectionHeader(title: '阅读'),
+          ListTile(
+            leading: const Icon(Icons.library_books_outlined),
+            title: const Text('书源管理'),
+            subtitle: const Text('添加、编辑、测试书源'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/book-sources'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.explore_outlined),
+            title: const Text('发现 / 排行'),
+            subtitle: const Text('浏览各书源热门榜单'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/discover'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.history),
+            title: const Text('阅读历史'),
+            subtitle: const Text('查看近期阅读记录'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/reading-history'),
+          ),
+          const Divider(),
           _SectionHeader(title: '外观'),
           ListTile(
             leading: const Icon(Icons.brightness_6_outlined),
@@ -50,6 +81,15 @@ class SettingsPage extends ConsumerWidget {
               ],
             ),
             onTap: () {},
+          ),
+          const Divider(),
+          _SectionHeader(title: '数据'),
+          ListTile(
+            leading: const Icon(Icons.backup_outlined),
+            title: const Text('备份与恢复'),
+            subtitle: const Text('导出 / 恢复书架、进度、书源等'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/backup'),
           ),
           const Divider(),
           _SectionHeader(title: '更新'),

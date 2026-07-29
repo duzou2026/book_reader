@@ -199,6 +199,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             tooltip: '书源管理',
             onPressed: () => context.push('/book-sources'),
           ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: '设置',
+            onPressed: () => context.push('/settings'),
+          ),
         ],
       ),
       body: Column(

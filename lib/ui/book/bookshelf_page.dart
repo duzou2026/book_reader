@@ -268,11 +268,6 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
             onPressed: _checkingUpdates ? null : _checkUpdates,
           ),
           IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: '阅读历史',
-            onPressed: () => context.push('/reading-history'),
-          ),
-          IconButton(
             icon: const Icon(Icons.settings),
             tooltip: '设置',
             onPressed: () => context.push('/settings'),
