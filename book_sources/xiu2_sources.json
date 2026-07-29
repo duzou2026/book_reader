@@ -51,57 +51,6 @@
     "weightValue": null
   },
   {
-    "bookSourceName": "🌞晴天小说4.0",
-    "bookSourceUrl": "http://v1.gyks.cf/#小说",
-    "bookSourceType": 0,
-    "enabled": true,
-    "bookSourceGroup": "",
-    "searchUrl": "/search?title={{key}}&tab=小说&source=全部",
-    "loginUrl": "http://v1.gyks.cf/login",
-    "ruleSearch": {
-      "bookList": "$.data",
-      "name": "$.book_name",
-      "author": "$.author",
-      "kind": "$.tags",
-      "wordCount": "$.word_number",
-      "lastChapter": "{{$.source}} {{$.last_chapter_title}}",
-      "intro": "$.abstract",
-      "coverUrl": "$.thumb_url",
-      "bookUrl": "/detail?book_id={{$.book_id}}&source={{$.source}}&tab={{$.tab}}"
-    },
-    "ruleBookInfo": {
-      "name": "$.book_name",
-      "author": "$.author",
-      "intro": "🎴当前来源：{{$.source}}\n🎯最新章节：{{$.last_chapter_title || '未知'}}\n⏳更新时间：{{$.last_chapter_update_time || '未知'}}\n📚书籍简介：\n{{$.abstract}}",
-      "coverUrl": "$.thumb_url",
-      "kind": "$.tags",
-      "lastChapter": "$.last_chapter_title",
-      "tocUrl": "/catalog?book_id={{$.book_id}}&source={{$.source}}&tab={{$.tab}}",
-      "wordCount": "$.word_number"
-    },
-    "ruleToc": {
-      "chapterList": "$.data",
-      "chapterName": "$.title",
-      "chapterUrl": "/content?item_id={{$.item_id}}&source={{$.source}}&tab={{$.tab}}&version=4.6.29",
-      "nextTocUrl": "",
-      "isVolume": "$.is_volume",
-      "isVip": "",
-      "updateTime": "$.volume_name"
-    },
-    "ruleContent": {
-      "content": "$.content",
-      "nextContentUrl": "",
-      "replaceRegex": "",
-      "imageStyle": ""
-    },
-    "header": "",
-    "priority": 0,
-    "weight": 1,
-    "lastUpdateTime": 1755432222352,
-    "respondTime": 95,
-    "weightValue": null
-  },
-  {
     "bookSourceName": "快眼看书",
     "bookSourceUrl": "http://www.xbotaodz.com",
     "bookSourceType": 0,
