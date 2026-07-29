@@ -378,7 +378,10 @@ class RuleEngine {
   /// 捕获组不存在时替换为空串（而非原样保留 `$1`）。
   static final _purifyRefPattern = RegExp(r'\$(\d+|\{(\d+)\}|<([^>]+)>)');
 
-  String _expandPurifyReplacement(String replacement, RegExpMatch m) {
+  String _expandPurifyReplacement(String replacement, Match m) {
+    // replaceAllMapped 传入的 Match 实际是 RegExpMatch，
+    // 这里强转以访问 namedGroup 等方法。
+    final rm = m as RegExpMatch;
     final buf = StringBuffer();
     var lastEnd = 0;
     for (final ref in _purifyRefPattern.allMatches(replacement)) {
@@ -387,12 +390,12 @@ class RuleEngine {
       String? value;
       if (g1.startsWith('{')) {
         final n = int.tryParse(ref.group(2)!);
-        if (n != null) value = _safeGroup(m, n);
+        if (n != null) value = _safeGroup(rm, n);
       } else if (g1.startsWith('<')) {
-        value = m.namedGroup(ref.group(3)!);
+        value = rm.namedGroup(ref.group(3)!);
       } else {
         final n = int.tryParse(g1);
-        if (n != null) value = _safeGroup(m, n);
+        if (n != null) value = _safeGroup(rm, n);
       }
       buf.write(value ?? '');
       lastEnd = ref.end;

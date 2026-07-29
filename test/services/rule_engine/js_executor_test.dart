@@ -7,12 +7,16 @@ import 'package:book_reader/services/rule_engine/js_executor.dart';
 ///
 /// 这些测试需在 integration_test 或真机/模拟器上跑。本地 `flutter test` 时
 /// 自动跳过。
+///
+/// 注意：JsExecutor.eval 内部用 try-catch 兜底 JS 运行时错误，返回 null。
+/// 因此这里不能只靠"是否抛异常"判断，还要检查返回值是否非 null。
 bool _canRunJs() {
   try {
     final executor = JsExecutor();
     // 真正调用一次 eval 才会触发 FFI 加载 native 库
-    executor.eval('"ok"', 'js:result');
-    return true;
+    // native 库不可用时 eval 返回 null（被内部 try-catch 吞掉异常）
+    final result = executor.eval('"ok"', 'js:result');
+    return result != null;
   } catch (_) {
     return false;
   }
