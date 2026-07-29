@@ -272,47 +272,71 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
             tooltip: '设置',
             onPressed: () => context.push('/settings'),
           ),
-          PopupMenuButton<BookshelfSort>(
-            icon: const Icon(Icons.sort),
-            tooltip: '排序',
-            onSelected: (v) => setState(() => _sort = v),
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: BookshelfSort.recent,
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.tune),
+            tooltip: '排序与视图',
+            onSelected: (v) {
+              setState(() {
+                switch (v) {
+                  case 'sort_recent':
+                    _sort = BookshelfSort.recent;
+                    break;
+                  case 'sort_added':
+                    _sort = BookshelfSort.added;
+                    break;
+                  case 'sort_title':
+                    _sort = BookshelfSort.title;
+                    break;
+                  case 'toggle_view':
+                    _viewMode = _viewMode == BookshelfViewMode.list
+                        ? BookshelfViewMode.grid
+                        : BookshelfViewMode.list;
+                    break;
+                }
+              });
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'sort_recent',
                 child: Row(children: [
                   Icon(Icons.access_time, size: 18),
                   SizedBox(width: 8),
                   Text('最近阅读'),
                 ]),
               ),
-              PopupMenuItem(
-                value: BookshelfSort.added,
+              const PopupMenuItem(
+                value: 'sort_added',
                 child: Row(children: [
                   Icon(Icons.bookmark_add, size: 18),
                   SizedBox(width: 8),
                   Text('加入时间'),
                 ]),
               ),
-              PopupMenuItem(
-                value: BookshelfSort.title,
+              const PopupMenuItem(
+                value: 'sort_title',
                 child: Row(children: [
                   Icon(Icons.sort_by_alpha, size: 18),
                   SizedBox(width: 8),
                   Text('书名'),
                 ]),
               ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'toggle_view',
+                child: Row(children: [
+                  Icon(
+                    _viewMode == BookshelfViewMode.list
+                        ? Icons.grid_view
+                        : Icons.view_list,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(_viewMode == BookshelfViewMode.list
+                      ? '切换到网格视图'
+                      : '切换到列表视图'),
+                ]),
+              ),
             ],
-          ),
-          IconButton(
-            icon: Icon(_viewMode == BookshelfViewMode.list
-                ? Icons.grid_view
-                : Icons.view_list),
-            tooltip: _viewMode == BookshelfViewMode.list ? '网格视图' : '列表视图',
-            onPressed: () => setState(() {
-              _viewMode = _viewMode == BookshelfViewMode.list
-                  ? BookshelfViewMode.grid
-                  : BookshelfViewMode.list;
-            }),
           ),
         ],
       ),
@@ -504,7 +528,7 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 1),
                         decoration: BoxDecoration(
-                          color: Colors.teal.withOpacity(0.12),
+                          color: Colors.teal.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(e.group,
@@ -531,7 +555,7 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.12),
+                      color: Colors.red.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -600,7 +624,7 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 4, vertical: 1),
                           decoration: BoxDecoration(
-                            color: Colors.teal.withOpacity(0.85),
+                            color: Colors.teal.withValues(alpha: 0.85),
                             borderRadius: BorderRadius.circular(3),
                           ),
                           child: Text(e.group,

@@ -215,7 +215,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               controller: _controller,
               onSubmitted: (_) => _search(),
               decoration: InputDecoration(
-                hintText: '输入书名或作者',
+                hintText: '输入书名或作者…',
                 prefixIcon: const Icon(Icons.search),
                 border: const OutlineInputBorder(),
                 suffixIcon: _loading
@@ -260,7 +260,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.12),
+                      color: Colors.orange.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
@@ -352,7 +352,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                     horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: _filterSourceUrl != null
-                      ? Colors.teal.withOpacity(0.12)
+                      ? Colors.teal.withValues(alpha: 0.12)
                       : ThemeColors.surfaceLevel1(context),
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -392,7 +392,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                     horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: _filterKind != null
-                      ? Colors.teal.withOpacity(0.12)
+                      ? Colors.teal.withValues(alpha: 0.12)
                       : ThemeColors.surfaceLevel1(context),
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -471,7 +471,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           Text(
             p.total == 0
                 ? '无可用书源，请先导入'
-                : '搜索中 ${p.completed}/${p.total} 源已返回 · 已找到 ${p.resultCount} 条',
+                : '搜索中… ${p.completed}/${p.total} 源已返回 · 已找到 ${p.resultCount} 条',
             style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12),
           ),
         ],
@@ -497,7 +497,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Material(
-        color: Colors.teal.withOpacity(0.10),
+        color: Colors.teal.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(6),
         child: Padding(
           padding:

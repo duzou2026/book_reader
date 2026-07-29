@@ -542,24 +542,36 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                                       color: ThemeColors.mutedText(context), fontSize: 12)),
                             ],
                             const SizedBox(height: 10),
-                            // 加入书架按钮
-                            OutlinedButton.icon(
-                              onPressed: _toggleBookshelf,
-                              icon: Icon(
-                                _inBookshelf
-                                    ? Icons.bookmark
-                                    : Icons.bookmark_border,
-                                size: 16,
-                              ),
-                              label: Text(_inBookshelf ? '已收藏' : '加入书架'),
-                              style: OutlinedButton.styleFrom(
+                            // 收藏状态标签（加入书架操作统一到底部导航栏）
+                            if (_inBookshelf)
+                              Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 4),
-                                minimumSize: const Size(0, 32),
-                                tapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.bookmark,
+                                        size: 14,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary),
+                                    const SizedBox(width: 4),
+                                    Text('已收藏',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary)),
+                                  ],
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -839,7 +851,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: isActive
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.12)
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
               : ThemeColors.surfaceLevel1(context),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
@@ -875,18 +887,21 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
 
   Widget _buildTocHeader() {
     final hasVolumes = _chapters.any((c) => c.isVolume);
-    return ListTile(
-      dense: true,
-      title: Text('目录 (${_chapters.length})',
-          style: const TextStyle(fontWeight: FontWeight.w600)),
-      trailing: Wrap(
-        spacing: 0,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+      child: Row(
         children: [
           if (_loadingToc)
-            const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2)),
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+          Text('目录 (${_chapters.length})',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          const Spacer(),
           IconButton(
             tooltip: _tocSearchMode ? '退出搜索' : '搜索章节',
             icon: Icon(
@@ -931,9 +946,9 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                   : _expandAllVolumes(),
             ),
           if (_info != null && _chapters.isNotEmpty)
-            TextButton.icon(
-              icon: const Icon(Icons.headphones, size: 18),
-              label: const Text('听书'),
+            IconButton(
+              tooltip: '听书',
+              icon: const Icon(Icons.headphones, size: 20),
               onPressed: _loadingAudio ? null : _playAudio,
             ),
         ],
