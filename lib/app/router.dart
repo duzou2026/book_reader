@@ -14,6 +14,7 @@ import 'package:book_reader/ui/settings/settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+
 /// 全局路由配置。
 ///
 /// - 主导航（书架/搜书）使用 [ShellRoute] + 底部 [NavigationBar]，
@@ -118,31 +119,21 @@ class _HomeShell extends StatelessWidget {
     if (idx < 0) idx = 1; // 默认搜书
     return Scaffold(
       body: child,
-      bottomNavigationBar: Theme(
-        data: Theme.of(context).copyWith(
-          navigationBarTheme: NavigationBarThemeData(
-            height: 56,
-            labelTextStyle: WidgetStatePropertyAll(
-              TextStyle(fontSize: 10, height: 1.0),
-            ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: idx,
+        onDestinationSelected: (i) => context.go(_tabs[i].$1),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.bookmark_border_outlined),
+            selectedIcon: Icon(Icons.bookmark_rounded),
+            label: '书架',
           ),
-        ),
-        child: NavigationBar(
-          selectedIndex: idx,
-          onDestinationSelected: (i) => context.go(_tabs[i].$1),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.bookmark_border, size: 20),
-              selectedIcon: Icon(Icons.bookmark, size: 20),
-              label: '书架',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.search, size: 20),
-              selectedIcon: Icon(Icons.search, size: 20),
-              label: '搜书',
-            ),
-          ],
-        ),
+          NavigationDestination(
+            icon: Icon(Icons.search_outlined),
+            selectedIcon: Icon(Icons.search_rounded),
+            label: '搜书',
+          ),
+        ],
       ),
     );
   }

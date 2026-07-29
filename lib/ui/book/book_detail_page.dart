@@ -486,112 +486,147 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
-                // 顶部信息区 + 加入书架按钮
+                // 顶部信息区：卡片容器
                 Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (cover != null)
-                        GestureDetector(
-                          onTap: () => _showCoverPreview(cover),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: Image.network(
-                              cover,
-                              width: 100,
-                              height: 140,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  _coverPlaceholder(100, 140),
-                            ),
-                          ),
-                        )
-                      else
-                        _coverPlaceholder(100, 140),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(name,
-                                style: const TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 6),
-                            Text(author,
-                                style: TextStyle(
-                                    color: ThemeColors.mutedText(context), fontSize: 14)),
-                            if (kind != null) ...[
-                              const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 6,
-                                children: kind.split(RegExp(r'[,，、\s]+'))
-                                    .where((s) => s.isNotEmpty)
-                                    .map((k) => Chip(
-                                          label: Text(k, style: const TextStyle(fontSize: 11)),
-                                          visualDensity: VisualDensity.compact,
-                                          padding: EdgeInsets.zero,
-                                        ))
-                                    .toList(),
-                              ),
-                            ],
-                            if (wordCount != null) ...[
-                              const SizedBox(height: 6),
-                              Text('$wordCount · 共 ${_chapters.length} 章',
-                                  style: TextStyle(
-                                      color: ThemeColors.mutedText(context), fontSize: 12)),
-                            ],
-                            const SizedBox(height: 10),
-                            // 收藏状态标签（加入书架操作统一到底部导航栏）
-                            if (_inBookshelf)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .primary
-                                      .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(4),
+                  padding: const EdgeInsets.all(12),
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (cover != null)
+                            GestureDetector(
+                              onTap: () => _showCoverPreview(cover),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  cover,
+                                  width: 100,
+                                  height: 140,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _coverPlaceholder(100, 140),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.bookmark,
-                                        size: 14,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary),
-                                    const SizedBox(width: 4),
-                                    Text('已收藏',
-                                        style: TextStyle(
-                                            fontSize: 12,
+                              ),
+                            )
+                          else
+                            _coverPlaceholder(100, 140),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(name,
+                                    style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        height: 1.25)),
+                                const SizedBox(height: 6),
+                                Text(author,
+                                    style: TextStyle(
+                                        color: ThemeColors.mutedText(context),
+                                        fontSize: 14)),
+                                if (kind != null) ...[
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 4,
+                                    runSpacing: 4,
+                                    children: kind
+                                        .split(RegExp(r'[,，、\s]+'))
+                                        .where((s) => s.isNotEmpty)
+                                        .map((k) => Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary
+                                                    .withValues(alpha: 0.08),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(k,
+                                                  style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .primary)),
+                                            ))
+                                        .toList(),
+                                  ),
+                                ],
+                                if (wordCount != null) ...[
+                                  const SizedBox(height: 8),
+                                  Text('$wordCount · 共 ${_chapters.length} 章',
+                                      style: TextStyle(
+                                          color: ThemeColors.mutedText(context),
+                                          fontSize: 12)),
+                                ],
+                                const SizedBox(height: 10),
+                                // 收藏状态标签
+                                if (_inBookshelf)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.bookmark_rounded,
+                                            size: 14,
                                             color: Theme.of(context)
                                                 .colorScheme
-                                                .primary)),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
+                                                .primary),
+                                        const SizedBox(width: 4),
+                                        Text('已收藏',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary)),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
                 // D-1: 多源对比区
                 _buildSourcesSection(),
                 if (intro != null) ...[
-                  const Divider(),
                   Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('简介',
-                            style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(height: 8),
-                        _buildIntro(intro),
-                      ],
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('简介',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary)),
+                            const SizedBox(height: 8),
+                            _buildIntro(intro),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],

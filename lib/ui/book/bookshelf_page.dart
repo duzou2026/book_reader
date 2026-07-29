@@ -441,141 +441,170 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
   }
 
   Widget _buildListView(List<BookshelfEntry> list) {
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       itemCount: list.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, i) {
         final e = list[i];
-        return Dismissible(
-          key: ValueKey(e.id),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            color: Colors.red,
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 24),
-            child: const Icon(Icons.delete, color: Colors.white),
-          ),
-          confirmDismiss: (_) async {
-            return await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('移出书架'),
-                    content: Text('确定将《${e.bookName}》移出书架？'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(false),
-                        child: const Text('取消'),
-                      ),
-                      FilledButton(
-                        onPressed: () => Navigator.of(ctx).pop(true),
-                        child: const Text('移出'),
-                      ),
-                    ],
-                  ),
-                ) ??
-                false;
-          },
-          onDismissed: (_) => _remove(e),
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: e.coverUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Image.network(
-                      e.coverUrl!,
-                      width: 50,
-                      height: 70,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          _coverPlaceholder(50, 70),
-                    ),
-                  )
-                : _coverPlaceholder(50, 70),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    e.bookName,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _formatTime(e.lastReadAt),
-                  style: TextStyle(
-                      color: ThemeColors.mutedText(context), fontSize: 11),
-                ),
-              ],
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Dismissible(
+            key: ValueKey(e.id),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 24),
+              child: const Icon(Icons.delete_outline, color: Colors.white),
             ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      e.author,
-                      style: TextStyle(
-                          color: ThemeColors.mutedText(context), fontSize: 12),
-                    ),
-                    if (e.group.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: Colors.teal.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(4),
+            confirmDismiss: (_) async {
+              return await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('移出书架'),
+                      content: Text('确定将《${e.bookName}》移出书架？'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('取消'),
                         ),
-                        child: Text(e.group,
-                            style: const TextStyle(fontSize: 10)),
+                        FilledButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: const Text('移出'),
+                        ),
+                      ],
+                    ),
+                  ) ??
+                  false;
+            },
+            onDismissed: (_) => _remove(e),
+            child: Card(
+              child: InkWell(
+                onTap: () => _openBook(e),
+                onLongPress: () => _showEntryMenu(e),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 封面
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: e.coverUrl != null
+                            ? Image.network(
+                                e.coverUrl!,
+                                width: 52,
+                                height: 72,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _coverPlaceholder(52, 72),
+                              )
+                            : _coverPlaceholder(52, 72),
+                      ),
+                      const SizedBox(width: 12),
+                      // 信息
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 书名 + 时间
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    e.bookName,
+                                    style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _formatTime(e.lastReadAt),
+                                  style: TextStyle(
+                                      color: ThemeColors.mutedText(context),
+                                      fontSize: 11),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            // 作者 + 分组
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    e.author,
+                                    style: TextStyle(
+                                        color: ThemeColors.mutedText(context),
+                                        fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (e.group.isNotEmpty) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: Colors.teal.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(e.group,
+                                        style: const TextStyle(fontSize: 10)),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            if (e.lastChapterName != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                '读到：${e.lastChapterName}',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontSize: 12,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                            if (e.hasUpdate) ...[
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withValues(alpha: 0.10),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  e.lastChapter != null
+                                      ? '有更新：${e.lastChapter}'
+                                      : '有更新',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-                if (e.lastChapterName != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    '读到：${e.lastChapterName}',
-                    style: TextStyle(
-                      color: Colors.teal.shade700,
-                      fontSize: 12,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-                if (e.hasUpdate) ...[
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      e.lastChapter != null
-                          ? '有更新：${e.lastChapter}'
-                          : '有更新',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.red,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
-            trailing: Icon(Icons.chevron_right, color: ThemeColors.mutedText(context)),
-            onTap: () => _openBook(e),
-            onLongPress: () => _showEntryMenu(e),
           ),
         );
       },

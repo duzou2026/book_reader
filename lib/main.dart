@@ -112,24 +112,136 @@ class _BookReaderAppState extends ConsumerState<BookReaderApp> {
   Widget build(BuildContext context) {
     final prefs = ref.watch(themePrefsProvider);
     final seed = Color(prefs.seedColor);
+    final lightScheme = ColorScheme.fromSeed(seedColor: seed);
+    final darkScheme = ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: Brightness.dark,
+    );
     return MaterialApp.router(
       key: _appKey,
       title: 'Book Reader',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: seed),
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: seed,
-          brightness: Brightness.dark,
-        ),
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
+      theme: _buildTheme(lightScheme, Brightness.light),
+      darkTheme: _buildTheme(darkScheme, Brightness.dark),
       themeMode: _toMaterialThemeMode(prefs.mode),
       routerConfig: appRouter,
+    );
+  }
+
+  /// 构建精致主题：统一圆角、阴影、字号层级、AppBar 风格。
+  ThemeData _buildTheme(ColorScheme scheme, Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      visualDensity: VisualDensity.adaptivePlatformDensity,
+      // AppBar：无阴影、透明背景、大标题
+      appBarTheme: AppBarTheme(
+        centerTitle: false,
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+        titleTextStyle: TextStyle(
+          color: scheme.onSurface,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
+        iconTheme: IconThemeData(color: scheme.onSurface, size: 22),
+      ),
+      // 卡片：圆角 + 柔和阴影
+      cardTheme: CardThemeData(
+        color: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.black.withValues(alpha: 0.05),
+            width: 0.5,
+          ),
+        ),
+      ),
+      // 列表项：更舒适的留白
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      // 分割线：更柔和
+      dividerTheme: DividerThemeData(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.black.withValues(alpha: 0.06),
+        thickness: 0.5,
+        space: 0.5,
+      ),
+      // 输入框：圆角填充式
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.black.withValues(alpha: 0.04),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: scheme.primary, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      ),
+      // 按钮：圆角
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      ),
+      // 底部导航：精致
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        height: 64,
+        indicatorShape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
+        labelTextStyle: WidgetStatePropertyAll(
+          TextStyle(fontSize: 11, height: 1.2, fontWeight: FontWeight.w500),
+        ),
+      ),
+      // 芯片：圆角
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      // 文本字号层级
+      textTheme: TextTheme(
+        headlineLarge: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, height: 1.2),
+        headlineMedium: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, height: 1.25),
+        titleLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, height: 1.3),
+        titleMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, height: 1.3),
+        bodyLarge: TextStyle(fontSize: 15, height: 1.5),
+        bodyMedium: TextStyle(fontSize: 13, height: 1.5),
+        bodySmall: TextStyle(fontSize: 11, height: 1.4),
+      ),
     );
   }
 
