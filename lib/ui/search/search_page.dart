@@ -1,6 +1,7 @@
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/data/search_history_repository.dart';
+import 'package:book_reader/domain/usecases/discover_books.dart';
 import 'package:book_reader/services/search/search_aggregator.dart';
 import 'package:book_reader/services/search/search_result_cache.dart';
 import 'package:book_reader/ui/common/theme_colors.dart';
@@ -43,6 +44,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   /// 热门词。
   List<String> _hot = const [];
 
+  /// 为你推荐：discover 聚合的热门书（首次进入空态懒加载）。
+  List<SearchResult> _recommend = const [];
+  bool _recommendLoading = false;
+  bool _recommendLoaded = false;
+
   /// 排序方式。
   SearchResultSort _sort = SearchResultSort.sourceCount;
 
@@ -74,6 +80,29 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       _history = history;
       _hot = hot;
     });
+  }
+
+  /// 懒加载推荐书榜：首次进入空态触发，失败静默（不阻塞搜索体验）。
+  Future<void> _loadRecommend() async {
+    if (_recommendLoaded || _recommendLoading) return;
+    setState(() => _recommendLoading = true);
+    try {
+      final list = await ref.read(discoverBooksProvider).fetch(
+        DiscoverCategories.all.first,
+      );
+      if (!mounted) return;
+      setState(() {
+        _recommend = list.take(8).toList();
+        _recommendLoaded = true;
+        _recommendLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _recommendLoaded = true;
+        _recommendLoading = false;
+      });
+    }
   }
 
   Future<void> _search({String? keyword, bool forceRefresh = false}) async {
@@ -534,11 +563,16 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     );
   }
 
-  /// 初始空态：历史词 + 热门词。
+  /// 初始空态：推荐书榜 + 历史词 + 热门词。
   Widget _buildSuggestions() {
+    // 首次进入空态懒加载推荐书榜
+    if (!_recommendLoaded && !_recommendLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadRecommend());
+    }
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
+        _buildRecommendSection(),
         if (_history.isNotEmpty) ...[
           _buildSectionHeader(
             title: '搜索历史',
@@ -579,6 +613,97 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           ),
         ),
       ],
+    );
+  }
+
+  /// 为你推荐区块：横向滚动展示热门书榜（取多源覆盖数 top）。
+  Widget _buildRecommendSection() {
+    if (_recommendLoading && _recommend.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (_recommend.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(
+          title: '为你推荐',
+          actionText: '更多',
+          onAction: () => context.push('/discover'),
+        ),
+        SizedBox(
+          height: 168,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            itemCount: _recommend.length,
+            itemBuilder: (context, i) {
+              final r = _recommend[i];
+              final cover = r.coverUrl;
+              return GestureDetector(
+                onTap: () => context.push('/book', extra: r),
+                child: Container(
+                  width: 96,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: cover != null
+                            ? Image.network(
+                                cover,
+                                width: 96,
+                                height: 128,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _recommendPlaceholder(),
+                              )
+                            : _recommendPlaceholder(),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        r.bookName,
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (r.author.isNotEmpty)
+                        Text(
+                          r.author,
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: ThemeColors.mutedText(context)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _recommendPlaceholder() {
+    return Container(
+      width: 96,
+      height: 128,
+      color: ThemeColors.surfaceLevel2(context),
+      child: Icon(Icons.book, color: ThemeColors.mutedText(context), size: 28),
     );
   }
 

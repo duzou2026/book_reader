@@ -10,6 +10,7 @@ import 'package:book_reader/domain/usecases/resolve_chapter_content.dart';
 import 'package:book_reader/services/preferences/reading_prefs_repository.dart';
 import 'package:book_reader/services/text/chinese_converter.dart';
 import 'package:book_reader/services/tts/tts_service.dart';
+import 'package:book_reader/services/tts/edge_tts_service.dart';
 import 'package:book_reader/ui/book/chapter_download_sheet.dart';
 import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
@@ -235,6 +236,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
         if (_content != null && _content!.trim().isNotEmpty) {
           final tts = ref.read(ttsServiceProvider);
           final prefs = ref.read(readingPrefsProvider);
+          if (tts is EdgeTtsService) tts.voice = prefs.ttsVoice;
           tts.speak(
             _content!,
             rate: prefs.ttsRate,
@@ -532,6 +534,15 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
   // TTS 朗读
   // ───────────────────────────────────────────────────────────────────
 
+  /// 同步发音人到当前偏好（EdgeTtsService 支持运行时切换 voice）。
+  void _syncTtsVoice() {
+    final tts = ref.read(ttsServiceProvider);
+    final prefs = ref.read(readingPrefsProvider);
+    if (tts is EdgeTtsService && tts.voice != prefs.ttsVoice) {
+      tts.voice = prefs.ttsVoice;
+    }
+  }
+
   /// 切换 TTS：停止→朗读 / 朗读→暂停 / 暂停→恢复。
   Future<void> _toggleTts() async {
     final tts = ref.read(ttsServiceProvider);
@@ -553,6 +564,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
         }
         // 自动阅读暂停，避免冲突
         _stopAutoRead();
+        _syncTtsVoice();
         tts.speak(
           text,
           rate: prefs.ttsRate,
@@ -1577,6 +1589,39 @@ class _SettingsSheet extends ConsumerWidget {
                         textAlign: TextAlign.right),
                   ),
                 ],
+              ),
+              // TTS 发音人（edge_tts 多发音人选择）
+              Row(
+                children: [
+                  const SizedBox(width: 72, child: Text('朗读发音人')),
+                  Expanded(
+                    child: DropdownButton<String>(
+                      value: kEdgeTtsVoices
+                              .any((v) => v.shortName == prefs.ttsVoice)
+                          ? prefs.ttsVoice
+                          : kDefaultEdgeVoice,
+                      isExpanded: true,
+                      underline: const SizedBox(),
+                      items: kEdgeTtsVoices
+                          .map((v) => DropdownMenuItem(
+                                value: v.shortName,
+                                child: Text(v.label, style: const TextStyle(fontSize: 13)),
+                              ))
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) notifier.setTtsVoice(v);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 72, top: 2),
+                child: Text(
+                  '神经网络语音需联网，音质优于系统 TTS',
+                  style: TextStyle(
+                      fontSize: 11, color: ThemeColors.mutedText(context)),
+                ),
               ),
               const SizedBox(height: 12),
               const Text('字体', style: TextStyle(fontSize: 14)),

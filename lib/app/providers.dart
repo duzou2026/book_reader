@@ -32,6 +32,7 @@ import 'package:book_reader/services/preferences/reading_prefs_repository.dart';
 import 'package:book_reader/services/preferences/theme_prefs_repository.dart';
 import 'package:book_reader/services/tts/tts_service.dart';
 import 'package:book_reader/services/tts/flutter_tts_service.dart';
+import 'package:book_reader/services/tts/edge_tts_service.dart';
 import 'package:book_reader/services/rule_engine/rule_engine.dart';
 import 'package:book_reader/services/search/search_aggregator.dart';
 import 'package:book_reader/services/search/search_result_cache.dart';
@@ -175,15 +176,17 @@ final chapterCacheRepositoryProvider = Provider<ChapterCacheRepository>((ref) {
 
 /// TTS 服务。
 ///
-/// - 移动端（Android/iOS）：使用 [FlutterTtsService]（基于 flutter_tts 插件，
-///   调用系统 TTS 引擎）。
-/// - Web：flutter_tts 不支持，回退到 [NoOpTtsService]（由前端 Web Speech API
-///   自行处理，或直接报错提示）。
+/// - 移动端（Android/iOS）：默认使用 [EdgeTtsService]（微软 Edge 神经语音，
+///   多发音人、音质好、需联网）。发音人取自 [ReadingPrefs.ttsVoice]。
+/// - Web：edge_tts/flutter_tts 均不支持，回退到 [NoOpTtsService]。
+///
+/// 发音人在阅读页设置面板切换，调用处（reader_page）在 speak 前会同步 voice。
 final ttsServiceProvider = Provider<TtsService>((ref) {
   if (kIsWeb) {
     return NoOpTtsService();
   }
-  return FlutterTtsService();
+  final prefs = ref.read(readingPrefsProvider);
+  return EdgeTtsService(voice: prefs.ttsVoice);
 });
 
 /// 全局阅读偏好（响应式）：所有页面共享同一份偏好。

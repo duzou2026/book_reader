@@ -35,6 +35,9 @@ class ReadingPrefs {
   /// TTS 音调（0.5-2.0）。
   final double ttsPitch;
 
+  /// TTS 发音人 shortName（edge_tts，默认晓晓）。
+  final String ttsVoice;
+
   /// 是否繁体显示。
   final bool traditionalChinese;
 
@@ -49,6 +52,7 @@ class ReadingPrefs {
     this.autoReadSpeed = 0,
     this.ttsRate = 1.0,
     this.ttsPitch = 1.0,
+    this.ttsVoice = 'zh-CN-XiaoxiaoNeural',
     this.traditionalChinese = false,
   });
 
@@ -65,6 +69,7 @@ class ReadingPrefs {
         'autoReadSpeed': autoReadSpeed,
         'ttsRate': ttsRate,
         'ttsPitch': ttsPitch,
+        'ttsVoice': ttsVoice,
         'traditionalChinese': traditionalChinese,
       };
 
@@ -83,6 +88,7 @@ class ReadingPrefs {
       autoReadSpeed: json['autoReadSpeed'] as int? ?? 0,
       ttsRate: (json['ttsRate'] as num?)?.toDouble() ?? 1.0,
       ttsPitch: (json['ttsPitch'] as num?)?.toDouble() ?? 1.0,
+      ttsVoice: json['ttsVoice'] as String? ?? 'zh-CN-XiaoxiaoNeural',
       traditionalChinese: json['traditionalChinese'] as bool? ?? false,
     );
   }
@@ -98,6 +104,7 @@ class ReadingPrefs {
     int? autoReadSpeed,
     double? ttsRate,
     double? ttsPitch,
+    String? ttsVoice,
     bool? traditionalChinese,
   }) {
     return ReadingPrefs(
@@ -113,6 +120,7 @@ class ReadingPrefs {
       autoReadSpeed: autoReadSpeed ?? this.autoReadSpeed,
       ttsRate: ttsRate ?? this.ttsRate,
       ttsPitch: ttsPitch ?? this.ttsPitch,
+      ttsVoice: ttsVoice ?? this.ttsVoice,
       traditionalChinese: traditionalChinese ?? this.traditionalChinese,
     );
   }
@@ -208,6 +216,11 @@ class ReadingPrefsNotifier extends StateNotifier<ReadingPrefs> {
 
   Future<void> setTtsPitch(double v) async {
     state = state.copyWith(ttsPitch: v);
+    await _repo.save(state);
+  }
+
+  Future<void> setTtsVoice(String v) async {
+    state = state.copyWith(ttsVoice: v);
     await _repo.save(state);
   }
 
