@@ -14,22 +14,20 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final dir = await getApplicationDocumentsDirectory();
   Hive.init(dir.path);
-  final bookSourceBox = await Hive.openBox<String>('book_sources');
-  final bookSourcesCacheBox =
-      await Hive.openBox<String>('book_sources_cache');
-  final bookshelfBox =
-      await Hive.openBox<String>('bookshelf');
-  final readingProgressBox =
-      await Hive.openBox<String>('reading_progress');
-  final readingPrefsBox =
-      await Hive.openBox<String>('reading_prefs');
-  final searchHistoryBox =
-      await Hive.openBox<String>('search_history');
-  final notesBox = await Hive.openBox<String>('notes');
-  final bookmarksBox = await Hive.openBox<String>('bookmarks');
-  final readingStatsBox = await Hive.openBox<String>('reading_stats');
-  final readingHistoryBox = await Hive.openBox<String>('reading_history');
-  final chapterCacheBox = await Hive.openBox<String>('chapter_cache');
+  // 启动兜底：任何 Hive box 损坏（被杀进程/存储异常导致写入中断）时，
+  // 自动删除该 box 文件并重建空 box，避免 main() 抛异常导致白屏。
+  // 代价：损坏的那个 box 数据丢失，但 App 能启动，远好于整个白屏进不去。
+  final bookSourceBox = await _safeOpenBox('book_sources');
+  final bookSourcesCacheBox = await _safeOpenBox('book_sources_cache');
+  final bookshelfBox = await _safeOpenBox('bookshelf');
+  final readingProgressBox = await _safeOpenBox('reading_progress');
+  final readingPrefsBox = await _safeOpenBox('reading_prefs');
+  final searchHistoryBox = await _safeOpenBox('search_history');
+  final notesBox = await _safeOpenBox('notes');
+  final bookmarksBox = await _safeOpenBox('bookmarks');
+  final readingStatsBox = await _safeOpenBox('reading_stats');
+  final readingHistoryBox = await _safeOpenBox('reading_history');
+  final chapterCacheBox = await _safeOpenBox('chapter_cache');
   // 迁移：清除 book_sources box 中误写的缓存 key（历史 bug 遗留）
   // 旧版 RemoteBookSources 把 List JSON 写入 box['xiu2_sources']，
   // 导致 HiveBookSourceRepository.getAll() 遍历到该 value 时
@@ -68,11 +66,33 @@ Future<void> main() async {
 ///      - 拉取失败 → 静默忽略，App 启动后用户可在书源管理页重试
 Future<void> _seedRemoteBookSources(
     Box<String> box, Box<String> cacheBox) async {
-  if (box.isNotEmpty) return;
-  final fetcher = RemoteBookSources(cacheBox: cacheBox);
-  final sources = await fetcher.fetch(forceRefresh: true);
-  for (final s in sources) {
-    await box.put(s.bookSourceUrl, jsonEncode(s.toJson()));
+  try {
+    if (box.isNotEmpty) return;
+    final fetcher = RemoteBookSources(cacheBox: cacheBox);
+    final sources = await fetcher.fetch(forceRefresh: true);
+    for (final s in sources) {
+      await box.put(s.bookSourceUrl, jsonEncode(s.toJson()));
+    }
+  } catch (e) {
+    // 拉取/写入失败都不应阻塞启动：用户可在书源管理页点「刷新书源」重试
+    debugPrint('启动拉取远程书源失败（已忽略）：$e');
+  }
+}
+
+/// 安全打开 Hive box：打开失败（box 文件损坏）时删除该 box 后重建空 box。
+///
+/// Hive box 文件可能因进程被杀、存储空间不足、系统清理等导致写入中断而损坏，
+/// 直接 `openBox` 会抛异常让整个 `main()` 崩溃 → 白屏。
+/// 这里 catch 后 `deleteBoxFromDisk` 删除损坏文件再重开，牺牲该 box 数据保启动。
+Future<Box<String>> _safeOpenBox(String name) async {
+  try {
+    return await Hive.openBox<String>(name);
+  } catch (e) {
+    debugPrint('打开 box "$name" 失败，尝试删除重建：$e');
+    try {
+      await Hive.deleteBoxFromDisk(name);
+    } catch (_) {}
+    return Hive.openBox<String>(name);
   }
 }
 
