@@ -65,5 +65,11 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- flutter_tts 需要：Android 11+ 包可见性限制下，
+             不声明则 TextToSpeech 引擎查询返回 null，speak() 静默失败，
+             表现为点击朗读按钮没有任何反应。 -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
     </queries>
 </manifest>
