@@ -51,57 +51,6 @@
     "weightValue": null
   },
   {
-    "bookSourceName": "SF轻小说🎃#4",
-    "bookSourceUrl": "https://minipapi.sfacg.com#🎃",
-    "bookSourceType": 0,
-    "enabled": true,
-    "bookSourceGroup": "轩1",
-    "searchUrl": "https://m.sfacg.com/API/HTML5.ashx?op=search&keyword={{key}}",
-    "loginUrl": "",
-    "ruleSearch": {
-      "bookList": "$.Novels",
-      "name": "$.NovelName",
-      "author": "$.AuthorName",
-      "kind": "$.TypeName",
-      "wordCount": "",
-      "lastChapter": "",
-      "intro": "",
-      "coverUrl": "https://rs.sfacg.com/web/novel/images/NovelCover/Big/{{$.NovelCover}}",
-      "bookUrl": "https://minipapi.sfacg.com/pas/mpapi/novels/{{$.NovelID}}?expand=latestchapter,chapterCount,typeName,intro,fav,ticket,pointCount,tags,sysTags,signlevel,discount,discountExpireDate,totalNeedFireMoney,originTotalNeedFireMoney"
-    },
-    "ruleBookInfo": {
-      "name": "$.data.novelName",
-      "author": "$.data.authorName",
-      "intro": "$.data.expand.intro",
-      "coverUrl": "$.data.novelCover",
-      "kind": "$.data.typeName",
-      "lastChapter": "$.data.expand.latestChapter.title",
-      "tocUrl": "https://minipapi.sfacg.com/pas/mpapi/novels/{{$.data.novelId}}/dirs",
-      "wordCount": "$.data.charCount"
-    },
-    "ruleToc": {
-      "chapterList": "$.data.volumeList[*].chapterList[*]",
-      "chapterName": "$.title",
-      "chapterUrl": "https://minipapi.sfacg.com/pas/mpapi/Chaps/{{$.chapId}}?expand=content,needFireMoney,originNeedFireMoney,tsukkomi&autoOrder=false",
-      "nextTocUrl": "",
-      "isVolume": "",
-      "isVip": "$.isVip",
-      "updateTime": "$.updateTime"
-    },
-    "ruleContent": {
-      "content": "$.data.expand.content",
-      "nextContentUrl": "",
-      "replaceRegex": "",
-      "imageStyle": ""
-    },
-    "header": "{\n\"content-type\": \"application/json\",\n\"sf-minip-info\": \"minip_novel/1.0.70(android;10)/wxmp\",\n\"authorization\": \"Basic YW5kcm9pZHVzZXI6MWEjJDUxLXl0Njk7KkFjdkBxeHE=\"\n}",
-    "priority": 0,
-    "weight": 1,
-    "lastUpdateTime": 0,
-    "respondTime": 122,
-    "weightValue": null
-  },
-  {
     "bookSourceName": "🌞晴天小说4.0",
     "bookSourceUrl": "http://v1.gyks.cf/#小说",
     "bookSourceType": 0,
@@ -153,7 +102,7 @@
     "weightValue": null
   },
   {
-    "bookSourceName": "快眼看书（优+）",
+    "bookSourceName": "快眼看书",
     "bookSourceUrl": "http://www.xbotaodz.com",
     "bookSourceType": 0,
     "enabled": true,
@@ -201,57 +150,6 @@
     "weight": 1,
     "lastUpdateTime": 1766339917225,
     "respondTime": 2223,
-    "weightValue": null
-  },
-  {
-    "bookSourceName": "安轻小说",
-    "bookSourceUrl": "https://minipapi.sfacg.com#",
-    "bookSourceType": 0,
-    "enabled": true,
-    "bookSourceGroup": "",
-    "searchUrl": "https://m.sfacg.com/API/HTML5.ashx?op=search&keyword={{key}}",
-    "loginUrl": "",
-    "ruleSearch": {
-      "bookList": "$.Novels",
-      "name": "$.NovelName",
-      "author": "$.AuthorName",
-      "kind": "$.TypeName",
-      "wordCount": "",
-      "lastChapter": "",
-      "intro": "",
-      "coverUrl": "https://rs.sfacg.com/web/novel/images/NovelCover/Big/{{$.NovelCover}}",
-      "bookUrl": "https://minipapi.sfacg.com/pas/mpapi/novels/{{$.NovelID}}?expand=latestchapter,chapterCount,typeName,intro,fav,ticket,pointCount,tags,sysTags,signlevel,discount,discountExpireDate,totalNeedFireMoney,originTotalNeedFireMoney"
-    },
-    "ruleBookInfo": {
-      "name": "$.data.novelName",
-      "author": "$.data.authorName",
-      "intro": "$.data.expand.intro",
-      "coverUrl": "$.data.novelCover",
-      "kind": "$.data.typeName",
-      "lastChapter": "$.data.expand.latestChapter.title",
-      "tocUrl": "https://minipapi.sfacg.com/pas/mpapi/novels/{{$.data.novelId}}/dirs",
-      "wordCount": "$.data.charCount"
-    },
-    "ruleToc": {
-      "chapterList": "$.data.volumeList[*].chapterList[*]",
-      "chapterName": "$.title",
-      "chapterUrl": "https://minipapi.sfacg.com/pas/mpapi/Chaps/{{$.chapId}}?expand=content,needFireMoney,originNeedFireMoney,tsukkomi&autoOrder=false",
-      "nextTocUrl": "",
-      "isVolume": "",
-      "isVip": "$.isVip",
-      "updateTime": "$.updateTime"
-    },
-    "ruleContent": {
-      "content": "$.data.expand.content",
-      "nextContentUrl": "",
-      "replaceRegex": "",
-      "imageStyle": ""
-    },
-    "header": "{\n\"content-type\": \"application/json\",\n\"sf-minip-info\": \"minip_novel/1.0.70(android;10)/wxmp\",\n\"authorization\": \"Basic YW5kcm9pZHVzZXI6MWEjJDUxLXl0Njk7KkFjdkBxeHE=\"\n}",
-    "priority": 0,
-    "weight": 1,
-    "lastUpdateTime": 1734779890266,
-    "respondTime": 244,
     "weightValue": null
   },
   {
@@ -306,59 +204,8 @@
     "weightValue": null
   },
   {
-    "bookSourceName": "快眼看书🎃#2",
-    "bookSourceUrl": "http://www.xbotaodz.com#🎃",
-    "bookSourceType": 0,
-    "enabled": true,
-    "bookSourceGroup": "轩1",
-    "searchUrl": "/modules/article/search.php?searchkey={{key}}",
-    "loginUrl": "",
-    "ruleSearch": {
-      "bookList": "class.librarylist@tag.li",
-      "name": "class.info@tag.span.0@tag.a@text",
-      "author": "class.info@tag.span.1@text",
-      "kind": "",
-      "wordCount": "",
-      "lastChapter": "class.last@tag.a@text",
-      "intro": "",
-      "coverUrl": "class.pt-ll-l@tag.a@tag.img@src",
-      "bookUrl": "class.info@tag.span.0@tag.a@href"
-    },
-    "ruleBookInfo": {
-      "name": "class.w-left@tag.h1@text",
-      "author": "class.novelinfo-l@tag.li.0@text##作者：",
-      "intro": "class.novelintro@text",
-      "coverUrl": "class.novelinfo-r@tag.a@tag.img@src",
-      "kind": "",
-      "lastChapter": "",
-      "tocUrl": "",
-      "wordCount": ""
-    },
-    "ruleToc": {
-      "chapterList": "class.fulldir@tag.ul@tag.li@tag.a",
-      "chapterName": "text",
-      "chapterUrl": "href",
-      "nextTocUrl": "",
-      "isVolume": "",
-      "isVip": "",
-      "updateTime": ""
-    },
-    "ruleContent": {
-      "content": "id.chaptercontent@textNodes",
-      "nextContentUrl": "",
-      "replaceRegex": "",
-      "imageStyle": ""
-    },
-    "header": "",
-    "priority": 0,
-    "weight": 1,
-    "lastUpdateTime": 0,
-    "respondTime": 358,
-    "weightValue": null
-  },
-  {
     "bookSourceName": "穿越小说",
-    "bookSourceUrl": "http://www.kk169.net#",
+    "bookSourceUrl": "http://www.kk169.net",
     "bookSourceType": 0,
     "enabled": true,
     "bookSourceGroup": "轩1",
@@ -408,7 +255,7 @@
     "weightValue": null
   },
   {
-    "bookSourceName": "快眼看书（优+）",
+    "bookSourceName": "快眼看书②",
     "bookSourceUrl": "http://www.booksky.cc",
     "bookSourceType": 0,
     "enabled": true,
@@ -456,159 +303,6 @@
     "weight": 0,
     "lastUpdateTime": 1766340762142,
     "respondTime": 18236,
-    "weightValue": null
-  },
-  {
-    "bookSourceName": "快眼看书",
-    "bookSourceUrl": "http://www.booksky.cc#🎃",
-    "bookSourceType": 0,
-    "enabled": true,
-    "bookSourceGroup": "轩1",
-    "searchUrl": "http://www.booksky.cc/modules/article/search.php?searchkey={{key}}",
-    "loginUrl": "",
-    "ruleSearch": {
-      "bookList": "class.librarylist@tag.li",
-      "name": "class.info@tag.span.0@tag.a@text",
-      "author": "class.info@tag.span.1@text",
-      "kind": "",
-      "wordCount": "",
-      "lastChapter": "class.last@tag.a@text",
-      "intro": "",
-      "coverUrl": "class.pt-ll-l@tag.a@tag.img@src",
-      "bookUrl": "class.info@tag.span.0@tag.a@href"
-    },
-    "ruleBookInfo": {
-      "name": "class.w-left@tag.h1@text",
-      "author": "class.novelinfo-l@tag.li.0@text##作者：",
-      "intro": "class.novelintro@text##各位书友要是.*",
-      "coverUrl": "class.novelinfo-r@tag.a@tag.img@src",
-      "kind": "[property=\"og:novel:category\"]@content&&[property=\"og:novel:status\"]@content",
-      "lastChapter": "class.novelinfo-l@li@a@text",
-      "tocUrl": "",
-      "wordCount": ""
-    },
-    "ruleToc": {
-      "chapterList": "class.fulldir@tag.ul@tag.li@tag.a",
-      "chapterName": "text",
-      "chapterUrl": "href",
-      "nextTocUrl": "",
-      "isVolume": "",
-      "isVip": "",
-      "updateTime": ""
-    },
-    "ruleContent": {
-      "content": "id.chaptercontent@textNodes",
-      "nextContentUrl": "",
-      "replaceRegex": "",
-      "imageStyle": ""
-    },
-    "header": "",
-    "priority": 0,
-    "weight": 1,
-    "lastUpdateTime": 1721118220473,
-    "respondTime": 402,
-    "weightValue": null
-  },
-  {
-    "bookSourceName": "快眼看书",
-    "bookSourceUrl": "http://www.booksky.cc#",
-    "bookSourceType": 0,
-    "enabled": true,
-    "bookSourceGroup": "",
-    "searchUrl": "http://www.booksky.cc/modules/article/search.php?searchkey={{key}}",
-    "loginUrl": "",
-    "ruleSearch": {
-      "bookList": "class.librarylist@tag.li",
-      "name": "class.info@tag.span.0@tag.a@text",
-      "author": "class.info@tag.span.1@text",
-      "kind": "",
-      "wordCount": "",
-      "lastChapter": "class.last@tag.a@text",
-      "intro": "",
-      "coverUrl": "class.pt-ll-l@tag.a@tag.img@src",
-      "bookUrl": "class.info@tag.span.0@tag.a@href"
-    },
-    "ruleBookInfo": {
-      "name": "class.w-left@tag.h1@text",
-      "author": "class.novelinfo-l@tag.li.0@text##作者：",
-      "intro": "class.novelintro@text##各位书友要是.*",
-      "coverUrl": "class.novelinfo-r@tag.a@tag.img@src",
-      "kind": "[property=\"og:novel:category\"]@content&&[property=\"og:novel:status\"]@content",
-      "lastChapter": "class.novelinfo-l@li@a@text",
-      "tocUrl": "",
-      "wordCount": ""
-    },
-    "ruleToc": {
-      "chapterList": "class.fulldir@tag.ul@tag.li@tag.a",
-      "chapterName": "text",
-      "chapterUrl": "href",
-      "nextTocUrl": "",
-      "isVolume": "",
-      "isVip": "",
-      "updateTime": ""
-    },
-    "ruleContent": {
-      "content": "id.chaptercontent@textNodes",
-      "nextContentUrl": "",
-      "replaceRegex": "",
-      "imageStyle": ""
-    },
-    "header": "",
-    "priority": 0,
-    "weight": 1,
-    "lastUpdateTime": 1734632877882,
-    "respondTime": 719,
-    "weightValue": null
-  },
-  {
-    "bookSourceName": "穿越小说",
-    "bookSourceUrl": "http://www.kk169.net",
-    "bookSourceType": 0,
-    "enabled": true,
-    "bookSourceGroup": "",
-    "searchUrl": "modules/article/search.php?q={{key}}",
-    "loginUrl": "",
-    "ruleSearch": {
-      "bookList": "div.c_row",
-      "name": ".c_subject a@text",
-      "author": "div.c_tag:nth-of-type(2) span:nth-of-type(2)@text",
-      "kind": "div.c_tag:nth-of-type(2) span:nth-of-type(4)@text",
-      "wordCount": "span:nth-of-type(6)@text",
-      "lastChapter": ".c_value a@text",
-      "intro": "div.c_description@text",
-      "coverUrl": "img@src",
-      "bookUrl": ".c_subject a@href"
-    },
-    "ruleBookInfo": {
-      "name": "[property=\"og:novel:book_name\"]@content",
-      "author": "[property=\"og:novel:author\"]@content",
-      "intro": "[property=\"og:description\"]@content",
-      "coverUrl": "img.1@src",
-      "kind": "[property=\"og:novel:category\"]@content&&[property=\"og:novel:status\"]@content&&[property=\"og:novel:update_time\"]@content",
-      "lastChapter": ".divbg@.cf@li.0@a.0@text",
-      "tocUrl": "a.b_hot@href",
-      "wordCount": ""
-    },
-    "ruleToc": {
-      "chapterList": ".chapter a",
-      "chapterName": "text",
-      "chapterUrl": "href",
-      "nextTocUrl": "",
-      "isVolume": "",
-      "isVip": "",
-      "updateTime": ""
-    },
-    "ruleContent": {
-      "content": "div.acontent@textNodes##\\(穿越小说 [a-zA-Z0-9]+.[a-zA-Z0-9]+.[a-zA-Z0-9]+\\)|穿越小说 [a-zA-Z0-9]+.[a-zA-Z0-9]+.[a-zA-Z0-9]+",
-      "nextContentUrl": "",
-      "replaceRegex": "",
-      "imageStyle": ""
-    },
-    "header": "",
-    "priority": 0,
-    "weight": 1,
-    "lastUpdateTime": 1734837146038,
-    "respondTime": 707,
     "weightValue": null
   },
   {
