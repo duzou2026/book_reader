@@ -3,11 +3,15 @@ import 'package:dio/dio.dart';
 
 /// App 更新检查器。
 ///
-/// 优先走 Gitee Releases API（国内访问快），若 Gitee release 没有 APK 资产
-/// （CI 跨境上传 Gitee 经常超时失败）则自动回退到 GitHub Releases API。
+/// 优先走 GitHub Releases API（CI 上传稳定，始终有最新版），GitHub 失败时
+/// 回退 Gitee Releases API。下载链接通过 gh-proxy 镜像国内加速。
 ///
-/// - Gitee API：https://gitee.com/api/v5/swagger#/getV5ReposOwnerRepoReleasesLatest
+/// 之前 Gitee 优先 + GitHub 回退，但 Gitee 跨境上传经常 cancelled，
+/// 导致 Gitee 上最新 release 是旧版，App 误判无更新且不回退 GitHub。
+/// 现在反转优先级，GitHub 始终可靠。
+///
 /// - GitHub API：https://docs.github.com/en/rest/releases/releases#get-the-latest-release
+/// - Gitee API：https://gitee.com/api/v5/swagger#/getV5ReposOwnerRepoReleasesLatest
 class AppUpdateChecker {
   AppUpdateChecker({
     required this.giteeOwner,
@@ -17,11 +21,11 @@ class AppUpdateChecker {
     Dio? dio,
   }) : _dio = dio ?? Dio();
 
-  /// Gitee 仓库 owner/repo（国内首选源）。
+  /// Gitee 仓库 owner/repo（回退源）。
   final String giteeOwner;
   final String giteeRepo;
 
-  /// GitHub 仓库 owner/repo（回退源，APK 始终能上传成功）。
+  /// GitHub 仓库 owner/repo（首选源，CI 上传稳定）。
   final String githubOwner;
   final String githubRepo;
 
@@ -29,18 +33,17 @@ class AppUpdateChecker {
 
   /// 拉取最新 release。
   ///
-  /// 策略：先查 Gitee，若 release 无 APK 资产则回退 GitHub。
+  /// 策略：先查 GitHub（稳定），失败时回退 Gitee。
   Future<AppUpdateInfo> fetchLatestRelease() async {
-    // 1. 先试 Gitee（国内快）
+    // 1. 首选 GitHub（CI 每次都成功上传 Release，始终有最新版）
     try {
-      final info = await _fetchGiteeLatest();
+      final info = await _fetchGithubLatest();
       if (info.assets.isNotEmpty) return info;
-      // Gitee release 存在但没有 APK（上传失败），回退 GitHub
     } catch (_) {
-      // Gitee 网络异常 / 404，回退 GitHub
+      // GitHub 网络异常（国内偶发），回退 Gitee
     }
-    // 2. 回退 GitHub
-    return _fetchGithubLatest();
+    // 2. 回退 Gitee
+    return _fetchGiteeLatest();
   }
 
   Future<AppUpdateInfo> _fetchGiteeLatest() async {

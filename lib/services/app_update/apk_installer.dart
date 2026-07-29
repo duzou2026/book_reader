@@ -44,9 +44,8 @@ class ApkInstaller {
     }
 
     // 下载源优先级（国内访问速度从快到慢）：
-    //   1. ghfast.top 镜像 GitHub Release（国内 CDN 加速，实测 6 秒下 25MB）
+    //   1. gh-proxy.com 镜像 GitHub Release（国内 CDN 加速，实测 3.2MB/s）
     //   2. 原始 GitHub release URL（兜底，国内通常很慢或超时）
-    // Gitee release 经常因跨境上传超时失败而拿不到 APK，不能作为可靠源。
     final urls = _buildDownloadUrls(asset.browserDownloadUrl);
     Object? lastError;
     for (final url in urls) {
@@ -92,8 +91,8 @@ class ApkInstaller {
     // 仅对 github.com 的 release 下载做镜像加速
     if (originalUrl.contains('github.com') &&
         originalUrl.contains('/releases/download/')) {
-      // ghfast.top: 国内访问稳定的 GitHub 加速代理，前缀拼接方式
-      urls.add('https://ghfast.top/$originalUrl');
+      // gh-proxy.com: 国内访问稳定的 GitHub 加速代理，实测 3.2MB/s
+      urls.add('https://gh-proxy.com/$originalUrl');
     }
     // 原始 URL 作为兜底（Gitee / 其他源直接用原 URL）
     urls.add(originalUrl);

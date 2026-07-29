@@ -1,7 +1,7 @@
 name: book_reader
 description: 全网搜书/看书/听书 App
 publish_to: 'none'
-version: 0.6.0+23
+version: 0.6.1+24
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
