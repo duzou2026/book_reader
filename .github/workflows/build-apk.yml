@@ -199,6 +199,10 @@ jobs:
           # curl -F 会自动生成带 boundary 的 Content-Type；手动覆盖会丢掉 boundary，
           # 导致 Gitee 服务端无法解析 multipart body，上传请求挂起直至超时。
           cd apks
+          # 禁用 set -e：上传循环内部已自行统计成功/失败，
+          # curl 超时(exit 28)在 set -e 下会让整个脚本直接退出，
+          # 导致 5 次重试逻辑形同虚设。此处关掉 -e 让重试真正生效。
+          set +e
           FAIL=0
           SUCCESS_COUNT=0
           for f in book_reader-*.apk; do
@@ -211,10 +215,15 @@ jobs:
             echo "上传 $f ..."
             SUCCESS=0
             for ATTEMPT in 1 2 3 4 5; do
-              UPLOAD_RESP=$(curl -sS --max-time 180 --connect-timeout 15 -X POST \
+              # 跨境上传 25MB+ APK 容易超时，用 300s 单次超时 + 5 次重试
+              UPLOAD_RESP=$(curl -sS --max-time 300 --connect-timeout 20 -X POST \
                 "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/${RELEASE_ID}/attach_files" \
                 -F "access_token=${GITEE_TOKEN}" \
                 -F "file=@${f}" 2>&1)
+              CURL_EXIT=$?
+              if [ "$CURL_EXIT" -ne 0 ]; then
+                echo "  ⚠ 第 $ATTEMPT 次 curl 退出码=$CURL_EXIT (28=超时)"
+              fi
               if echo "$UPLOAD_RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'  ✓ (第{sys.argv[1]}次) {d.get(\"name\",\"?\")} -> {d.get(\"browser_download_url\",\"?\")}')" "$ATTEMPT" 2>/dev/null; then
                 SUCCESS=1
                 SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
