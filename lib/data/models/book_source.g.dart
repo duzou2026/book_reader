@@ -35,6 +35,10 @@ _$BookSourceImpl _$$BookSourceImplFromJson(Map<String, dynamic> json) =>
       lastUpdateTime: _asObject(json['lastUpdateTime']),
       respondTime: _asObject(json['respondTime']),
       weightValue: json['weightValue'] as String?,
+      exploreUrl: json['exploreUrl'] as String?,
+      ruleExplore: json['ruleExplore'] == null
+          ? null
+          : RuleSearch.fromJson(json['ruleExplore'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$$BookSourceImplToJson(_$BookSourceImpl instance) =>
@@ -56,6 +60,8 @@ Map<String, dynamic> _$$BookSourceImplToJson(_$BookSourceImpl instance) =>
       'lastUpdateTime': instance.lastUpdateTime,
       'respondTime': instance.respondTime,
       'weightValue': instance.weightValue,
+      'exploreUrl': instance.exploreUrl,
+      'ruleExplore': instance.ruleExplore,
     };
 
 const _$BookSourceTypeEnumMap = {

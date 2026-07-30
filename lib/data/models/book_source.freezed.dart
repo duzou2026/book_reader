@@ -37,6 +37,8 @@ mixin _$BookSource {
   Object? get lastUpdateTime => throw _privateConstructorUsedError;
   Object? get respondTime => throw _privateConstructorUsedError;
   String? get weightValue => throw _privateConstructorUsedError;
+  String? get exploreUrl => throw _privateConstructorUsedError;
+  RuleSearch? get ruleExplore => throw _privateConstructorUsedError;
 
   /// Serializes this BookSource to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -71,12 +73,15 @@ abstract class $BookSourceCopyWith<$Res> {
       int weight,
       Object? lastUpdateTime,
       Object? respondTime,
-      String? weightValue});
+      String? weightValue,
+      String? exploreUrl,
+      RuleSearch? ruleExplore});
 
   $RuleSearchCopyWith<$Res>? get ruleSearch;
   $RuleBookInfoCopyWith<$Res>? get ruleBookInfo;
   $RuleTocCopyWith<$Res>? get ruleToc;
   $RuleContentCopyWith<$Res>? get ruleContent;
+  $RuleSearchCopyWith<$Res>? get ruleExplore;
 }
 
 /// @nodoc
@@ -111,6 +116,8 @@ class _$BookSourceCopyWithImpl<$Res, $Val extends BookSource>
     Object? lastUpdateTime = freezed,
     Object? respondTime = freezed,
     Object? weightValue = freezed,
+    Object? exploreUrl = freezed,
+    Object? ruleExplore = freezed,
   }) {
     return _then(_value.copyWith(
       bookSourceName: null == bookSourceName
@@ -181,6 +188,14 @@ class _$BookSourceCopyWithImpl<$Res, $Val extends BookSource>
           ? _value.weightValue
           : weightValue // ignore: cast_nullable_to_non_nullable
               as String?,
+      exploreUrl: freezed == exploreUrl
+          ? _value.exploreUrl
+          : exploreUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      ruleExplore: freezed == ruleExplore
+          ? _value.ruleExplore
+          : ruleExplore // ignore: cast_nullable_to_non_nullable
+              as RuleSearch?,
     ) as $Val);
   }
 
@@ -239,6 +254,20 @@ class _$BookSourceCopyWithImpl<$Res, $Val extends BookSource>
       return _then(_value.copyWith(ruleContent: value) as $Val);
     });
   }
+
+  /// Create a copy of BookSource
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $RuleSearchCopyWith<$Res>? get ruleExplore {
+    if (_value.ruleExplore == null) {
+      return null;
+    }
+
+    return $RuleSearchCopyWith<$Res>(_value.ruleExplore!, (value) {
+      return _then(_value.copyWith(ruleExplore: value) as $Val);
+    });
+  }
 }
 
 /// @nodoc
@@ -266,7 +295,9 @@ abstract class _$$BookSourceImplCopyWith<$Res>
       int weight,
       Object? lastUpdateTime,
       Object? respondTime,
-      String? weightValue});
+      String? weightValue,
+      String? exploreUrl,
+      RuleSearch? ruleExplore});
 
   @override
   $RuleSearchCopyWith<$Res>? get ruleSearch;
@@ -276,6 +307,8 @@ abstract class _$$BookSourceImplCopyWith<$Res>
   $RuleTocCopyWith<$Res>? get ruleToc;
   @override
   $RuleContentCopyWith<$Res>? get ruleContent;
+  @override
+  $RuleSearchCopyWith<$Res>? get ruleExplore;
 }
 
 /// @nodoc
@@ -308,6 +341,8 @@ class __$$BookSourceImplCopyWithImpl<$Res>
     Object? lastUpdateTime = freezed,
     Object? respondTime = freezed,
     Object? weightValue = freezed,
+    Object? exploreUrl = freezed,
+    Object? ruleExplore = freezed,
   }) {
     return _then(_$BookSourceImpl(
       bookSourceName: null == bookSourceName
@@ -378,6 +413,14 @@ class __$$BookSourceImplCopyWithImpl<$Res>
           ? _value.weightValue
           : weightValue // ignore: cast_nullable_to_non_nullable
               as String?,
+      exploreUrl: freezed == exploreUrl
+          ? _value.exploreUrl
+          : exploreUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      ruleExplore: freezed == ruleExplore
+          ? _value.ruleExplore
+          : ruleExplore // ignore: cast_nullable_to_non_nullable
+              as RuleSearch?,
     ));
   }
 }
@@ -402,7 +445,9 @@ class _$BookSourceImpl implements _BookSource {
       this.weight = 0,
       this.lastUpdateTime,
       this.respondTime,
-      this.weightValue});
+      this.weightValue,
+      this.exploreUrl,
+      this.ruleExplore});
 
   factory _$BookSourceImpl.fromJson(Map<String, dynamic> json) =>
       _$$BookSourceImplFromJson(json);
@@ -444,10 +489,14 @@ class _$BookSourceImpl implements _BookSource {
   final Object? respondTime;
   @override
   final String? weightValue;
+  @override
+  final String? exploreUrl;
+  @override
+  final RuleSearch? ruleExplore;
 
   @override
   String toString() {
-    return 'BookSource(bookSourceName: $bookSourceName, bookSourceUrl: $bookSourceUrl, bookSourceType: $bookSourceType, enabled: $enabled, bookSourceGroup: $bookSourceGroup, searchUrl: $searchUrl, loginUrl: $loginUrl, ruleSearch: $ruleSearch, ruleBookInfo: $ruleBookInfo, ruleToc: $ruleToc, ruleContent: $ruleContent, header: $header, priority: $priority, weight: $weight, lastUpdateTime: $lastUpdateTime, respondTime: $respondTime, weightValue: $weightValue)';
+    return 'BookSource(bookSourceName: $bookSourceName, bookSourceUrl: $bookSourceUrl, bookSourceType: $bookSourceType, enabled: $enabled, bookSourceGroup: $bookSourceGroup, searchUrl: $searchUrl, loginUrl: $loginUrl, ruleSearch: $ruleSearch, ruleBookInfo: $ruleBookInfo, ruleToc: $ruleToc, ruleContent: $ruleContent, header: $header, priority: $priority, weight: $weight, lastUpdateTime: $lastUpdateTime, respondTime: $respondTime, weightValue: $weightValue, exploreUrl: $exploreUrl, ruleExplore: $ruleExplore)';
   }
 
   @override
@@ -485,7 +534,11 @@ class _$BookSourceImpl implements _BookSource {
             (identical(other.respondTime, respondTime) ||
                 other.respondTime == respondTime) &&
             (identical(other.weightValue, weightValue) ||
-                other.weightValue == weightValue));
+                other.weightValue == weightValue) &&
+            (identical(other.exploreUrl, exploreUrl) ||
+                other.exploreUrl == exploreUrl) &&
+            (identical(other.ruleExplore, ruleExplore) ||
+                other.ruleExplore == ruleExplore));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -508,7 +561,9 @@ class _$BookSourceImpl implements _BookSource {
       weight,
       lastUpdateTime,
       respondTime,
-      weightValue);
+      weightValue,
+      exploreUrl,
+      ruleExplore);
 
   /// Create a copy of BookSource
   /// with the given fields replaced by the non-null parameter values.
@@ -544,7 +599,9 @@ abstract class _BookSource implements BookSource {
       final int weight,
       final Object? lastUpdateTime,
       final Object? respondTime,
-      final String? weightValue}) = _$BookSourceImpl;
+      final String? weightValue,
+      final String? exploreUrl,
+      final RuleSearch? ruleExplore}) = _$BookSourceImpl;
 
   factory _BookSource.fromJson(Map<String, dynamic> json) =
       _$BookSourceImpl.fromJson;
@@ -581,6 +638,10 @@ abstract class _BookSource implements BookSource {
   Object? get respondTime;
   @override
   String? get weightValue;
+  @override
+  String? get exploreUrl;
+  @override
+  RuleSearch? get ruleExplore;
 
   /// Create a copy of BookSource
   /// with the given fields replaced by the non-null parameter values.

@@ -8,6 +8,8 @@ import 'package:book_reader/ui/book/reader_page.dart';
 import 'package:book_reader/ui/book/reading_history_page.dart';
 import 'package:book_reader/ui/book_sources/book_source_edit_page.dart';
 import 'package:book_reader/ui/book_sources/book_sources_page.dart';
+import 'package:book_reader/ui/explore/explore_category_page.dart';
+import 'package:book_reader/ui/explore/explore_source_page.dart';
 import 'package:book_reader/ui/search/search_page.dart';
 import 'package:book_reader/ui/settings/backup_page.dart';
 import 'package:book_reader/ui/settings/settings_page.dart';
@@ -66,6 +68,20 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/discover',
       builder: (context, state) => const DiscoverPage(),
+    ),
+    GoRoute(
+      path: '/explore',
+      builder: (context, state) => const ExploreSourcePage(),
+    ),
+    GoRoute(
+      path: '/explore-category',
+      builder: (context, state) {
+        final source = state.extra as BookSource?;
+        if (source == null) {
+          return const Scaffold(body: Center(child: Text('参数缺失')));
+        }
+        return ExploreCategoryPage(source: source);
+      },
     ),
     GoRoute(
       path: '/settings',

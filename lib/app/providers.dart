@@ -10,6 +10,7 @@ import 'package:book_reader/data/search_history_repository.dart';
 import 'package:book_reader/domain/usecases/check_book_updates.dart';
 import 'package:book_reader/domain/usecases/discover_books.dart';
 import 'package:book_reader/domain/usecases/download_chapters.dart';
+import 'package:book_reader/domain/usecases/explore_books.dart';
 import 'package:book_reader/domain/usecases/get_audio.dart';
 import 'package:book_reader/domain/usecases/get_book_info.dart';
 import 'package:book_reader/domain/usecases/get_chapter_content.dart';
@@ -361,6 +362,14 @@ final discoverBooksProvider = Provider<DiscoverBooks>((ref) {
     aggregator: ref.watch(searchAggregatorProvider),
     getEnabledSources: () =>
         ref.watch(bookSourceRepositoryProvider).getEnabledSources(),
+  );
+});
+
+/// 书源分类浏览用例（按书源 exploreUrl 分类浏览该源内的书）。
+final exploreBooksProvider = Provider<ExploreBooks>((ref) {
+  return ExploreBooks(
+    fetcher: ref.watch(fetcherProvider),
+    ruleEngine: ref.watch(ruleEngineProvider),
   );
 });
 

@@ -41,6 +41,13 @@ class SettingsPage extends ConsumerWidget {
             onTap: () => context.push('/discover'),
           ),
           ListTile(
+            leading: const Icon(Icons.library_books),
+            title: const Text('书源浏览'),
+            subtitle: const Text('按分类浏览单个书源内的书'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/explore'),
+          ),
+          ListTile(
             leading: const Icon(Icons.history),
             title: const Text('阅读历史'),
             subtitle: const Text('查看近期阅读记录'),

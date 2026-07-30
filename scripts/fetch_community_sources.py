@@ -130,7 +130,8 @@ def normalize_source(source):
     """
     精简书源 JSON：去掉本项目用不到的字段，减小体积。
 
-    保留 legado 核心字段，丢弃评论、探索页等非搜索必需字段。
+    保留 legado 核心字段，丢弃评论等非搜索必需字段。
+    exploreUrl / ruleExplore 用于「书源分类浏览」功能，需一并保留。
     """
     keep_fields = [
         "bookSourceName",
@@ -145,6 +146,8 @@ def normalize_source(source):
         "ruleToc",
         "ruleContent",
         "header",
+        "exploreUrl",
+        "ruleExplore",
     ]
     result = {}
     for f in keep_fields:

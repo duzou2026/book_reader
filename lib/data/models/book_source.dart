@@ -41,6 +41,14 @@ class BookSource with _$BookSource {
     @JsonKey(fromJson: _asObject, toJson: _objectToJson) Object? lastUpdateTime,
     @JsonKey(fromJson: _asObject, toJson: _objectToJson) Object? respondTime,
     String? weightValue,
+    /// 书源发现页分类配置（legado 格式）。
+    /// 可能是 JSON 数组（含 title/url/style）或 `分类名::url` 文本对。
+    /// 详见 ExploreUrlParser。
+    String? exploreUrl,
+    /// 发现页书籍列表解析规则，复用 [RuleSearch] 类型。
+    /// legado 的 ruleExplore 与 ruleSearch 字段几乎一致
+    ///（bookList/name/author/kind/wordCount/lastChapter/intro/coverUrl/bookUrl）。
+    RuleSearch? ruleExplore,
   }) = _BookSource;
 
   factory BookSource.fromJson(Map<String, dynamic> json) =>
