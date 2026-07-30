@@ -45,6 +45,44 @@ void main() {
         isFalse,
       );
     });
+
+    test('returns false for 免登陆次数用尽 提示', () {
+      expect(
+        ContentValidator.isValid('今日免登陆次数已用尽，请登录后继续阅读。'),
+        isFalse,
+      );
+      expect(
+        ContentValidator.isValid('您的免登录次数已达上限，请明日再试。'),
+        isFalse,
+      );
+      expect(
+        ContentValidator.isValid('访问频繁，次数用尽，请稍后再试。'),
+        isFalse,
+      );
+    });
+
+    test('returns false for 反爬验证页', () {
+      expect(
+        ContentValidator.isValid('<html><script>var buid="abc";</script></html>'),
+        isFalse,
+      );
+      expect(
+        ContentValidator.isValid('<title>安全验证</title><body>请稍候...</body>'),
+        isFalse,
+      );
+      expect(
+        ContentValidator.isValid('<title>blocked</title>'),
+        isFalse,
+      );
+    });
+
+    test('returns true for 正常正文含 var 关键字（非反爬页）', () {
+      // 正则要求 `var\s+buid`（带空格），普通代码描述不应误判
+      expect(
+        ContentValidator.isValid('他写下 var x=1; 这行代码后，整个程序的逻辑就清晰了。'),
+        isTrue,
+      );
+    });
   });
 
   group('ContentValidator.isVip', () {

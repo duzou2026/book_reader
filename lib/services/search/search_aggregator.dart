@@ -33,8 +33,8 @@ class SearchProgress {
 ///
 /// 职责：
 ///   - 并发跑所有书源的 [SingleSourceSearcher.search]
-///   - 单源超时（默认 8s）→ 该源返回空，不影响其他
-///   - 单源抛异常 → 该源返回空
+///   - 单源超时（默认 12s）→ 该源返回空，不影响其他
+///   - 单源抛异常 → 重试 1 次，仍失败则该源返回空
 ///   - 每个源完成时通过 [onProgress] 回调上报进度
 ///   - 合并所有结果，按 `dedupKey` 去重，相同 key 的合并 `sources` 列表
 ///   - 返回 [List<SearchResult>]，按 `sources.length` 倒序（多源覆盖优先）
@@ -44,7 +44,7 @@ class SearchAggregator {
 
   SearchAggregator({
     required this.searcher,
-    this.perSourceTimeout = const Duration(seconds: 8),
+    this.perSourceTimeout = const Duration(seconds: 12),
   });
 
   /// 搜索并聚合结果。
@@ -73,9 +73,7 @@ class SearchAggregator {
     final futures = sources.map((s) async {
       List<SearchResult> list;
       try {
-        list = await searcher
-            .search(keyword, s)
-            .timeout(perSourceTimeout, onTimeout: () => const []);
+        list = await _searchWithRetry(keyword, s);
         statusMap[s.bookSourceName] = list.isEmpty ? 'empty' : 'ok';
       } catch (_) {
         list = const <SearchResult>[];
@@ -88,6 +86,26 @@ class SearchAggregator {
 
     await Future.wait(futures);
     return _mergeAndDedupe(aggregated);
+  }
+
+  /// 单源搜索 + 1 次重试。
+  ///
+  /// 首次失败（超时/异常）时重试一次，应对瞬时网络抖动。
+  /// 重试仍失败才视为该源无结果。
+  Future<List<SearchResult>> _searchWithRetry(
+      String keyword, BookSource s) async {
+    try {
+      // 不用 onTimeout：让超时抛 TimeoutException 才能触发 catch 重试
+      return await searcher.search(keyword, s).timeout(perSourceTimeout);
+    } catch (_) {
+      // 首次失败（含超时），重试一次
+      try {
+        return await searcher.search(keyword, s).timeout(perSourceTimeout);
+      } catch (_) {
+        // 重试仍失败，返回空
+        return const [];
+      }
+    }
   }
 
   /// 合并去重：相同 dedupKey 的结果合并 sources 列表，补充缺失的可选字段。

@@ -4,10 +4,20 @@ import 'package:book_reader/data/models/search_result.dart';
 ///
 /// 同一关键词在 TTL 内复用上次结果，避免重复请求多源。
 /// 用户可手动「刷新」绕过缓存。
+///
+/// 空结果用短 TTL（30s），避免因瞬时网络问题返回空后，
+/// 短时间内重搜仍命中空缓存导致用户以为"搜不到"。
 class SearchResultCache {
-  SearchResultCache({this.ttl = const Duration(minutes: 5)});
+  SearchResultCache({
+    this.ttl = const Duration(minutes: 5),
+    this.emptyTtl = const Duration(seconds: 30),
+  });
 
+  /// 非空结果的缓存时长。
   final Duration ttl;
+
+  /// 空结果的缓存时长（短，避免网络抖动导致的空结果长期缓存）。
+  final Duration emptyTtl;
 
   /// key = 关键词；value = (结果, 过期时间戳 ms)。
   final Map<String, _CacheEntry> _map = {};
@@ -24,10 +34,11 @@ class SearchResultCache {
   }
 
   void put(String keyword, List<SearchResult> results) {
+    final duration = results.isEmpty ? emptyTtl : ttl;
     _map[keyword] = _CacheEntry(
       results: List.of(results),
       expireAt:
-          DateTime.now().millisecondsSinceEpoch + ttl.inMilliseconds,
+          DateTime.now().millisecondsSinceEpoch + duration.inMilliseconds,
     );
   }
 

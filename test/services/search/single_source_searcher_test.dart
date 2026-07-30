@@ -201,5 +201,52 @@ void main() {
       // 空关键字不应过滤任何结果
       expect(results.length, 2);
     });
+
+    test('书名带书名号《》仍能匹配无标点关键字', () async {
+      const punctHtml = '''
+      <ul class="book-list">
+        <li><a href="/book/1" class="title">《三体》</a><span class="author">刘慈欣</span></li>
+        <li><a href="/book/2" class="title">活着</a><span class="author">余华</span></li>
+      </ul>
+      ''';
+      final fetcher = _FakeFetcher({
+        'https://example.com/search?q=%E4%B8%89%E4%BD%93': punctHtml,
+      });
+      searcher = SingleSourceSearcher(fetcher: fetcher, ruleEngine: engine);
+      final results = await searcher.search('三体', source);
+      expect(results.length, 1);
+      expect(results[0].bookName, '《三体》');
+    });
+
+    test('书名带冒号仍能匹配无标点关键字', () async {
+      const colonHtml = '''
+      <ul class="book-list">
+        <li><a href="/book/1" class="title">三体：地球往事</a><span class="author">刘慈欣</span></li>
+      </ul>
+      ''';
+      final fetcher = _FakeFetcher({
+        'https://example.com/search?q=%E4%B8%89%E4%BD%93': colonHtml,
+      });
+      searcher = SingleSourceSearcher(fetcher: fetcher, ruleEngine: engine);
+      final results = await searcher.search('三体', source);
+      expect(results.length, 1);
+      expect(results[0].bookName, '三体：地球往事');
+    });
+
+    test('关键字带书名号仍能匹配无标点书名', () async {
+      // 用户输入"《三体》"应能匹配书名"三体"
+      const plainHtml = '''
+      <ul class="book-list">
+        <li><a href="/book/1" class="title">三体</a><span class="author">刘慈欣</span></li>
+      </ul>
+      ''';
+      final fetcher = _FakeFetcher({
+        'https://example.com/search?q=%E3%80%8A%E4%B8%89%E4%BD%93%E3%80%8B': plainHtml,
+      });
+      searcher = SingleSourceSearcher(fetcher: fetcher, ruleEngine: engine);
+      final results = await searcher.search('《三体》', source);
+      expect(results.length, 1);
+      expect(results[0].bookName, '三体');
+    });
   });
 }

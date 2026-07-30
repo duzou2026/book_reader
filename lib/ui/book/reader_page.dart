@@ -93,6 +93,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
   /// TTS 朗读进度（0.0-1.0）。
   double _ttsProgress = 0.0;
 
+  /// 朗读时是否自动跟随滚动文本。用户手动滚动后置 false，停止跟随。
+  bool _autoFollowTts = true;
+
   /// 当前章节的所有笔记（用于划线高亮）。
   List<Note> _chapterNotes = const [];
 
@@ -148,6 +151,8 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
     tts.onProgress = (p) {
       if (!mounted) return;
       setState(() => _ttsProgress = p);
+      // 朗读时文本自动跟随：按音频进度比例滚动到对应位置
+      _autoFollowScroll(p);
     };
     tts.onComplete = () {
       if (!mounted) return;
@@ -163,6 +168,24 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
         SnackBar(content: Text(e), duration: const Duration(seconds: 2)),
       );
     };
+  }
+
+  /// 朗读进度驱动的自动滚动：按音频进度比例平滑滚动文本。
+  ///
+  /// 音频进度（position/duration）与文本长度大致成正比（朗读速度恒定），
+  /// 用比例近似定位。用户手动滚动后 [_autoFollowTts] 置 false，停止跟随，
+  /// 避免强制拉回干扰用户翻看。
+  void _autoFollowScroll(double progress) {
+    if (!_autoFollowTts) return;
+    final sc = _scrollController;
+    if (!sc.hasClients) return;
+    final max = sc.position.maxScrollExtent;
+    if (max <= 0) return;
+    final target = (progress * max).clamp(0.0, max);
+    // 用 jumpTo 避免动画堆积（onProgress 高频回调），平滑跟随
+    if ((sc.offset - target).abs() > 8) {
+      sc.jumpTo(target);
+    }
   }
 
   /// 恢复持久化的阅读位置（如果有）。
@@ -1058,8 +1081,29 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
   Widget _buildScrollBody(ReadingPrefs prefs, _Bg bg) {
     final raw = _content?.isNotEmpty == true ? _content! : '（本章内容为空）';
     final display = _displayText(raw, prefs);
-    return ListView(
-      controller: _scrollController,
+    // NotificationListener 检测用户手动滚动 → 停止朗读自动跟随
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        if (n is ScrollStartNotification) {
+          // dragDetails != null 表示用户手指拖动（程序 jumpTo 时为 null）
+          if (n.dragDetails != null) {
+            if (_autoFollowTts && _ttsState == TtsPlayState.speaking) {
+              _autoFollowTts = false;
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('已停止跟随朗读滚动（点击朗读按钮恢复跟随）'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            }
+          }
+        }
+        return false;
+      },
+      child: ListView(
+        controller: _scrollController,
       padding: const EdgeInsets.all(16),
       children: [
         Text(
@@ -1127,6 +1171,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
           ],
         ),
       ],
+      ),
     );
   }
 
