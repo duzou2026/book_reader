@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/app/router.dart';
+import 'package:book_reader/data/demo_book_sources.dart';
 import 'package:book_reader/data/remote_book_sources.dart';
+import 'package:book_reader/services/book_source/book_source_importer.dart';
 import 'package:book_reader/services/preferences/theme_prefs_repository.dart';
 import 'package:book_reader/ui/settings/app_update_controller.dart';
 import 'package:flutter/material.dart';
@@ -57,25 +59,48 @@ Future<void> main() async {
   );
 }
 
-/// 仅在 `book_sources` Box 为空时，从 GitHub 仓库远程拉取书源写入。
+/// 仅在 `book_sources` Box 为空时，从远程仓库拉取书源写入。
 ///
 /// 流程：
 ///   1. Box 非空 → 已有书源（用户配置过），跳过
 ///   2. Box 为空 → 通过 [RemoteBookSources] 拉取远程 JSON
 ///      - 拉取成功 → 缓存到独立的 [cacheBox] + 逐条写入各书源 URL 到 [box]
-///      - 拉取失败 → 静默忽略，App 启动后用户可在书源管理页重试
+///      - 拉取失败 → 用内置 [recommendedBookSourceJson] 兜底写入 2 条精简源
+///        （断网/被墙/Gitee 故障时仍能保证基础搜索能力，用户可在书源管理页刷新补全）
 Future<void> _seedRemoteBookSources(
     Box<String> box, Box<String> cacheBox) async {
   try {
     if (box.isNotEmpty) return;
     final fetcher = RemoteBookSources(cacheBox: cacheBox);
     final sources = await fetcher.fetch(forceRefresh: true);
+    if (sources.isEmpty) {
+      // 远程拉取返回空（网络故障），用内置兜底源
+      await _seedBuiltinSources(box);
+      return;
+    }
     for (final s in sources) {
       await box.put(s.bookSourceUrl, jsonEncode(s.toJson()));
     }
   } catch (e) {
-    // 拉取/写入失败都不应阻塞启动：用户可在书源管理页点「刷新书源」重试
-    debugPrint('启动拉取远程书源失败（已忽略）：$e');
+    // 拉取/写入失败都不应阻塞启动：用内置兜底源保证基础搜索能力
+    debugPrint('启动拉取远程书源失败（已用内置源兜底）：$e');
+    await _seedBuiltinSources(box);
+  }
+}
+
+/// 写入内置兜底书源（[recommendedBookSourceJson]）。
+///
+/// 仅在远程拉取失败时调用，保证用户首次启动至少有 2 条可用源可搜索。
+/// 用户后续可在「书源管理页 → 刷新书源」拉取完整列表覆盖。
+Future<void> _seedBuiltinSources(Box<String> box) async {
+  try {
+    if (box.isNotEmpty) return;
+    final sources = BookSourceImporter().parse(recommendedBookSourceJson);
+    for (final s in sources) {
+      await box.put(s.bookSourceUrl, jsonEncode(s.toJson()));
+    }
+  } catch (e) {
+    debugPrint('写入内置兜底书源失败：$e');
   }
 }
 

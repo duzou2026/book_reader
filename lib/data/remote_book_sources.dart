@@ -21,15 +21,27 @@ class RemoteBookSources {
     Dio? dio,
   }) : _dio = dio ?? Dio();
 
-  /// 远程书源 JSON 地址（Gitee 仓库 raw URL）。
+  /// 远程书源 JSON 镜像地址列表（按优先级排序）。
   ///
-  /// 用 Gitee 而非 GitHub：
-  ///   - Gitee 国内访问稳定快速（0.5s 内拉完 200KB）
-  ///   - GitHub raw / jsDelivr 在国内可能超时
-  ///   - 公开仓库 raw URL 无需鉴权，App 直连即可
-  ///   - 新增书源后用户点「刷新书源」可立即拉到最新（无 CDN 缓存延迟）
-  static const String remoteUrl =
-      'https://gitee.com/duzou_5aidnf/novel-reader/raw/master/book_sources/xiu2_sources.json';
+  /// 书源文件 `community_sources.json` 由 `scripts/fetch_community_sources.py`
+  /// 从 legado 社区书源聚合站（legado.aoaostar.com）拉取并过滤后生成，
+  /// 包含 150+ 条纯规则书源（已过滤掉依赖 JS 网络/Java 桥接/音频源等
+  /// 本项目不支持的源）。
+  ///
+  /// 多镜像策略提高首次拉取成功率：
+  ///   1. Gitee raw：国内访问稳定快速，无 CDN 缓存延迟
+  ///   2. GitHub raw：境外/VPN 用户兜底，Gitee 被墙时可用
+  ///   3. jsDelivr CDN：GitHub 镜像加速，国内访问较快但有缓存延迟
+  ///
+  /// 任一镜像拉取成功即停止，写入缓存后返回。
+  static const List<String> remoteUrls = [
+    'https://gitee.com/duzou_5aidnf/novel-reader/raw/master/book_sources/community_sources.json',
+    'https://raw.githubusercontent.com/duzou2026/book_reader/master/book_sources/community_sources.json',
+    'https://cdn.jsdelivr.net/gh/duzou2026/book_reader@master/book_sources/community_sources.json',
+  ];
+
+  /// 主镜像地址（兼容旧代码引用，实际拉取走 [remoteUrls] 列表）。
+  static const String remoteUrl = remoteUrls.first;
 
   /// Hive 中缓存书源 JSON 字符串的 box（**必须是独立 box**）。
   ///
@@ -46,8 +58,11 @@ class RemoteBookSources {
 
   final Dio _dio;
 
-  /// 缓存 key（写死，方便后续扩展多源订阅）。
-  static const String cacheKey = 'xiu2_sources';
+  /// 缓存 key。
+  ///
+  /// 改名自 `xiu2_sources` 以区分旧书源集，确保升级后拉取新的
+  /// community_sources.json 而非复用旧缓存。
+  static const String cacheKey = 'community_sources';
 
   /// 从远程拉取最新书源，写入缓存并返回。
   ///
@@ -62,29 +77,40 @@ class RemoteBookSources {
       final cached = _readCache();
       if (cached != null) return cached;
     }
-    try {
-      final response = await _dio.get<dynamic>(
-        remoteUrl,
-        options: Options(
-          responseType: ResponseType.plain,
-          // 网络不好时给 15s 超时
-          receiveTimeout: const Duration(seconds: 15),
-        ),
-      );
-      final body = response.data;
-      if (body is! String || body.isEmpty) {
-        throw FormatException('远程书源响应为空');
+    // 多镜像逐个尝试，任一成功即返回
+    Object? lastError;
+    for (final url in remoteUrls) {
+      try {
+        final response = await _dio.get<dynamic>(
+          url,
+          options: Options(
+            responseType: ResponseType.plain,
+            // 单镜像超时设短一点，失败快速切下一个镜像
+            connectTimeout: const Duration(seconds: 8),
+            receiveTimeout: const Duration(seconds: 15),
+          ),
+        );
+        final body = response.data;
+        if (body is! String || body.isEmpty) {
+          throw FormatException('远程书源响应为空');
+        }
+        final sources = _parseJson(body);
+        if (sources.isEmpty) {
+          throw FormatException('远程书源解析为空列表');
+        }
+        await _writeCache(body);
+        return sources;
+      } catch (e) {
+        lastError = e;
+        debugPrint('镜像拉取失败 $url：$e');
+        // 当前镜像失败，尝试下一个
       }
-      final sources = _parseJson(body);
-      await _writeCache(body);
-      return sources;
-    } catch (e) {
-      debugPrint('远程书源拉取失败：$e');
-      // 失败回退缓存
-      final cached = _readCache();
-      if (cached != null) return cached;
-      return const [];
     }
+    debugPrint('所有镜像拉取均失败：$lastError');
+    // 全部镜像失败 → 回退缓存
+    final cached = _readCache();
+    if (cached != null) return cached;
+    return const [];
   }
 
   /// 解析 JSON 字符串为 [BookSource] 列表。

@@ -84,7 +84,14 @@ class SingleSourceSearcher {
     // JSON 规则的特殊处理：evalElements 对 JSON 返回空，
     // 需要用 evalList 拿字符串列表，再构造结果
     if (elements.isEmpty) {
-      return _parseJsonBookList(body, bookListRule, source, rule, keyword);
+      final jsonResults = _parseJsonBookList(body, bookListRule, source, rule, keyword);
+      if (jsonResults.isNotEmpty) return jsonResults;
+
+      // 唯一搜索结果 302 跳转 fallback：
+      // 部分站点（如桃桃书）搜索只有一本书时直接 302 跳转到详情页，
+      // dio 跟随重定向后拿到详情页 HTML，bookList 选择器匹配不到列表项。
+      // 检查是否是详情页（有 og:novel:book_name），从 og meta 构造单条结果。
+      return _tryParseAsDetailPage(body, source, keyword);
     }
 
     final results = <SearchResult>[];
@@ -207,6 +214,58 @@ class SingleSourceSearcher {
     return results;
   }
 
+  /// 唯一搜索结果 302 跳转 fallback：检查响应是否是详情页。
+  ///
+  /// 部分站点（如桃桃书）搜索唯一匹配时直接 302 跳转到书籍详情页，
+  /// dio 跟随重定向后拿到的是详情页 HTML 而非搜索列表页，bookList
+  /// 选择器匹配不到任何元素。此时检查页面是否有 og:novel:book_name
+  /// meta 标签，如果有则从 og meta 提取书名/作者/URL，构造单条搜索结果。
+  ///
+  /// 这种 fallback 是通用的——任何使用 og meta 标签的"唯一结果跳转"站点
+  /// 都能受益，不限于桃桃书。
+  List<SearchResult> _tryParseAsDetailPage(
+    String body,
+    BookSource source,
+    String keyword,
+  ) {
+    // 用 XPath 从 og meta 标签提取书名
+    final name = ruleEngine.eval(body, "//meta[@property='og:novel:book_name']/@content");
+    if (name == null || name.trim().isEmpty) return [];
+
+    final author = ruleEngine.eval(body, "//meta[@property='og:novel:author']/@content") ?? '';
+    final coverUrl = ruleEngine.eval(body, "//meta[@property='og:image']/@content");
+    final intro = ruleEngine.eval(body, "//meta[@property='og:description']/@content");
+    // og:novel:read_url 是详情页 URL（书籍 URL）
+    final bookUrl = ruleEngine.eval(body, "//meta[@property='og:novel:read_url']/@content");
+
+    // 如果没有 read_url，用书源 URL 兜底（无法定位书籍，跳过）
+    if (bookUrl == null || bookUrl.trim().isEmpty) return [];
+
+    // 关键字相关性过滤
+    final keywordNorm = _normalize(keyword);
+    if (!_isRelevant(name, author, keywordNorm)) return [];
+
+    final absoluteBookUrl = _resolveUrl(bookUrl, source.bookSourceUrl);
+    final absoluteCoverUrl =
+        coverUrl == null ? null : _resolveUrl(coverUrl, source.bookSourceUrl);
+
+    return [
+      SearchResult(
+        bookName: name.trim(),
+        author: author.trim(),
+        coverUrl: absoluteCoverUrl,
+        intro: intro?.trim(),
+        sources: [
+          SearchSource(
+            sourceName: source.bookSourceName,
+            sourceUrl: source.bookSourceUrl,
+            bookUrl: absoluteBookUrl,
+          ),
+        ],
+      ),
+    ];
+  }
+
   /// 从 JSON 数据中按 bookList 规则提取列表。
   ///
   /// 支持复合规则 `$.a&&$.b`（合并两个 JSONPath 结果）。
@@ -253,10 +312,18 @@ class SingleSourceSearcher {
     return ruleEngine.evalOnElement(element, rule);
   }
 
-  /// 归一化字符串：去前后空白、压缩内部连续空白、转小写。
-  /// 用于关键字与书名/作者做包含判断前的统一处理。
+  /// 归一化字符串：去前后空白、压缩内部连续空白、转小写、去常见标点。
+  ///
+  /// 去除的标点包括书名号《》、引号、冒号、中英文标点等，
+  /// 让"《三体》"能匹配关键字"三体"，"三体：地球往事"能匹配"三体"。
+  /// 仍保留字母数字和中文，避免过度模糊导致误匹配。
   static String _normalize(String s) {
-    return s.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
+    return s
+        .toLowerCase()
+        .trim()
+        // 去除书名号、引号、括号、冒号、破折号等常见装饰性标点
+        .replaceAll(RegExp(r'[\u300a\u300b\u3001\u3002\uff08\uff09\u201c\u201d\u2018\u2019\uff1a\uff1b\u2014\u2026\u2015:;,\(\)\[\]【】《》「」『』]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ');
   }
 
   /// 判断搜索结果是否与关键字相关。
