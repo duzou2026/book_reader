@@ -46,6 +46,12 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      # 重新生成 freezed/json_serializable 代码
+      # 手动同步 .freezed.dart / .g.dart 容易遗漏嵌套 CopyWith 等细节，
+      # 交给 build_runner 保证生成代码与模型定义一致。
+      - name: Regenerate freezed code
+        run: dart run build_runner build --delete-conflicting-outputs
+
       - name: Verify analysis
         run: flutter analyze
         continue-on-error: true
