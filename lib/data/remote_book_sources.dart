@@ -41,7 +41,8 @@ class RemoteBookSources {
   ];
 
   /// 主镜像地址（兼容旧代码引用，实际拉取走 [remoteUrls] 列表）。
-  static const String remoteUrl = remoteUrls.first;
+  static const String remoteUrl =
+      'https://gitee.com/duzou_5aidnf/novel-reader/raw/master/book_sources/community_sources.json';
 
   /// Hive 中缓存书源 JSON 字符串的 box（**必须是独立 box**）。
   ///

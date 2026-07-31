@@ -85,7 +85,7 @@ jobs:
           ls -la android/app/release.keystore
 
       - name: Build release APK (split per ABI)
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release --split-per-abi --verbose
 
       - name: Verify APK signature & print cert fingerprint
         env:
