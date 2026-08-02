@@ -23,8 +23,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   /// 原始搜索结果（未排序/筛选）。
   List<SearchResult> _rawResults = const [];
 
-  /// 当前生效的关键词。
+  /// 当前生效的关键词（已提交搜索的）。
   String _lastKeyword = '';
+
+  /// 当前输入框中的文本（用于实时建议）。
+  String _inputQuery = '';
 
   bool _loading = false;
   String? _error;
@@ -50,7 +53,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   bool _recommendLoaded = false;
 
   /// 排序方式。
-  SearchResultSort _sort = SearchResultSort.sourceCount;
+  SearchResultSort _sort = SearchResultSort.relevance;
 
   /// 当前书源筛选（null = 全部）。
   String? _filterSourceUrl;
@@ -171,7 +174,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     if (_filterKind != null) {
       list = list.where((r) => _normalizeKind(r.kind) == _filterKind).toList();
     }
-    return sortSearchResults(list, _sort);
+    return sortSearchResults(list, _sort, keyword: _lastKeyword);
   }
 
   /// 提取所有出现过的书源（用于筛选条）。
@@ -242,6 +245,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             padding: const EdgeInsets.all(12),
             child: TextField(
               controller: _controller,
+              onChanged: (v) => setState(() => _inputQuery = v.trim()),
               onSubmitted: (_) => _search(),
               decoration: InputDecoration(
                 hintText: '输入书名或作者…',
@@ -277,6 +281,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               ),
             ),
           ),
+          // 实时输入建议：输入时匹配历史+热门词
+          if (_inputQuery.isNotEmpty && !_hasSearched)
+            _buildLiveSuggestions(),
           // 缓存徽章
           if (_fromCache && !_loading)
             Padding(
@@ -358,6 +365,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             ),
             onSelected: (v) => setState(() => _sort = v),
             itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: SearchResultSort.relevance,
+                child: Text('按相关性（智能匹配）'),
+              ),
               PopupMenuItem(
                 value: SearchResultSort.sourceCount,
                 child: Text('按源数（多源优先）'),
@@ -473,6 +484,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
   String _sortLabel(SearchResultSort s) {
     switch (s) {
+      case SearchResultSort.relevance:
+        return '相关性';
       case SearchResultSort.sourceCount:
         return '源数';
       case SearchResultSort.wordCount:
@@ -756,6 +769,89 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     );
   }
 
+  /// 实时输入建议：匹配历史+热门词（按匹配度排序）。
+  Widget _buildLiveSuggestions() {
+    final kw = _inputQuery.toLowerCase();
+    final suggestions = <_SuggestionItem>[];
+
+    // 从历史中匹配（按最近搜索时间排序）
+    for (final h in _history) {
+      if (h.keyword.toLowerCase().contains(kw)) {
+        suggestions.add(_SuggestionItem(h.keyword, true, h.searchedAt));
+      }
+    }
+    // 从热门中匹配（去重）
+    for (final h in _hot) {
+      if (h.toLowerCase().contains(kw) &&
+          !suggestions.any((s) => s.keyword == h)) {
+        suggestions.add(_SuggestionItem(h, false, 0));
+      }
+    }
+    if (suggestions.isEmpty) return const SizedBox.shrink();
+
+    // 排序：历史（按时间倒序）在前，热门在后
+    suggestions.sort((a, b) {
+      if (a.isHistory != b.isHistory) return a.isHistory ? -1 : 1;
+      if (a.isHistory) return b.searchedAt.compareTo(a.searchedAt);
+      return 0;
+    });
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 240),
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: ThemeColors.surfaceLevel1(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ThemeColors.outline(context), width: 0.5),
+      ),
+      child: ListView.builder(
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        itemCount: suggestions.length,
+        itemBuilder: (context, i) {
+          final s = suggestions[i];
+          return InkWell(
+            onTap: () {
+              _controller.text = s.keyword;
+              _search(keyword: s.keyword);
+            },
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    s.isHistory ? Icons.history : Icons.whatshot,
+                    size: 16,
+                    color: ThemeColors.mutedText(context),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      s.keyword,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.north_west,
+                        size: 16, color: ThemeColors.mutedText(context)),
+                    tooltip: '填入搜索框',
+                    onPressed: () {
+                      _controller.text = s.keyword;
+                      setState(() => _inputQuery = s.keyword);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   /// 搜索后无结果引导。
   Widget _buildNoResultGuide() {
     final p = _progress;
@@ -794,4 +890,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       ),
     );
   }
+}
+
+/// 实时建议项。
+class _SuggestionItem {
+  final String keyword;
+  final bool isHistory;
+  final int searchedAt;
+  const _SuggestionItem(this.keyword, this.isHistory, this.searchedAt);
 }

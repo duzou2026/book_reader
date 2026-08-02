@@ -1037,6 +1037,19 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
                       style: TextStyle(
                           fontSize: 11, color: bg.foreground.withOpacity(0.6)),
                     ),
+                    // TTS 自动跟随状态指示
+                    if (_ttsState != TtsPlayState.stopped) ...[
+                      const SizedBox(width: 6),
+                      Icon(
+                        _autoFollowTts
+                            ? Icons.my_location
+                            : Icons.location_off,
+                        size: 12,
+                        color: _autoFollowTts
+                            ? Colors.teal
+                            : bg.foreground.withOpacity(0.4),
+                      ),
+                    ],
                     const SizedBox(width: 8),
                     Expanded(
                       child: ClipRRect(
@@ -1355,22 +1368,54 @@ class _ChapterDrawer extends StatefulWidget {
 
 class _ChapterDrawerState extends State<_ChapterDrawer> {
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
   String _keyword = '';
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.currentIndex >= 0 &&
+          widget.currentIndex < widget.chapters.length) {
+        final itemHeight = 56.0;
+        final offset = widget.currentIndex * itemHeight -
+            _scrollController.position.viewportDimension / 2;
+        if (offset > 0) {
+          _scrollController.jumpTo(offset.clamp(
+            0.0,
+            _scrollController.position.maxScrollExtent,
+          ));
+        }
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final kw = _keyword.toLowerCase();
-    final filtered = kw.isEmpty
-        ? widget.chapters
-        : widget.chapters
-            .where((c) => c.name.toLowerCase().contains(kw))
-            .toList();
+    final List<_IndexedChapter> filtered;
+    if (kw.isEmpty) {
+      filtered = widget.chapters
+          .asMap()
+          .entries
+          .map((e) => _IndexedChapter(e.value, e.key))
+          .toList();
+    } else {
+      filtered = <_IndexedChapter>[];
+      for (int i = 0; i < widget.chapters.length; i++) {
+        final c = widget.chapters[i];
+        if (c.name.toLowerCase().contains(kw)) {
+          filtered.add(_IndexedChapter(c, i));
+        }
+      }
+    }
     final height = MediaQuery.of(context).size.height * 0.7;
     return SizedBox(
       height: height,
@@ -1429,10 +1474,12 @@ class _ChapterDrawerState extends State<_ChapterDrawer> {
           const SizedBox(height: 8),
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               itemCount: filtered.length,
               itemBuilder: (context, i) {
-                final c = filtered[i];
-                final originalIndex = widget.chapters.indexOf(c);
+                final ic = filtered[i];
+                final c = ic.chapter;
+                final originalIndex = ic.originalIndex;
                 final isCurrent = originalIndex == widget.currentIndex;
                 return ListTile(
                   dense: true,
@@ -1477,6 +1524,13 @@ class _ChapterDrawerState extends State<_ChapterDrawer> {
       ),
     );
   }
+}
+
+/// 带原始索引的章节包装类，避免目录搜索时反复 indexOf。
+class _IndexedChapter {
+  final Chapter chapter;
+  final int originalIndex;
+  const _IndexedChapter(this.chapter, this.originalIndex);
 }
 
 /// 设置面板（全局偏好，所有书共享）。
