@@ -879,6 +879,35 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                   : '换个关键词试试，或去书源管理添加更多源',
               style: TextStyle(color: ThemeColors.mutedText(context), fontSize: 12),
             ),
+            if (!noSource && _hot.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('热门搜索', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                alignment: WrapAlignment.center,
+                children: _hot
+                    .take(8)
+                    .map((k) => GestureDetector(
+                          onTap: () => _search(keyword: k),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: ThemeColors.surfaceLevel1(context),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color: ThemeColors.outline(context),
+                                  width: 0.5),
+                            ),
+                            child: Text(k,
+                                style: const TextStyle(fontSize: 12)),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ],
             const SizedBox(height: 16),
             FilledButton.tonalIcon(
               onPressed: () => context.push('/book-sources'),
