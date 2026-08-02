@@ -72,25 +72,138 @@ class CrossSourceContentResolver {
     return null;
   }
 
-  /// 模糊匹配章节：归一化后比较名字。
+  /// 模糊匹配章节：归一化后比较名字，并结合章节序号提高准确率。
   ///
-  /// 归一化规则：去空白、去常见标点、转小写。
-  /// 支持子串匹配（备选源章节名包含目标名，或反之）。
+  /// 匹配优先级：
+  ///   1. 章节序号精确匹配（从章节名解析的数字，如"第十章"→10）
+  ///   2. 章节名归一化后精确匹配
+  ///   3. 章节名子串匹配
+  ///   4. 序号相近 + 名字部分匹配（容错）
   Chapter? _matchChapter(Chapter target, List<Chapter> toc) {
     final targetName = _normalize(target.name);
-    if (targetName.isEmpty) return null;
+    final targetIndex = _parseChapterIndex(target.name);
+    if (targetName.isEmpty && targetIndex == null) return null;
 
-    // 精确匹配优先
-    for (final c in toc) {
-      if (_normalize(c.name) == targetName) return c;
+    // 收集所有候选及评分
+    final candidates = <_ChapterCandidate>[];
+
+    for (int i = 0; i < toc.length; i++) {
+      final c = toc[i];
+      if (c.isVolume) continue;
+
+      final cName = _normalize(c.name);
+      final cIndex = _parseChapterIndex(c.name);
+
+      int score = 0;
+
+      // 序号精确匹配（最高优先级）
+      if (targetIndex != null && cIndex != null && targetIndex == cIndex) {
+        score += 100;
+      }
+      // 序号接近（相差 ≤ 2），作为弱信号
+      if (targetIndex != null && cIndex != null) {
+        final diff = (targetIndex - cIndex).abs();
+        if (diff == 1) score += 10;
+        else if (diff == 2) score += 5;
+      }
+      // 名字精确匹配
+      if (cName.isNotEmpty && cName == targetName) {
+        score += 80;
+      }
+      // 名字子串匹配
+      else if (cName.isNotEmpty && targetName.isNotEmpty) {
+        if (cName.contains(targetName) || targetName.contains(cName)) {
+          score += 40;
+        }
+      }
+      // 备选源目录位置接近（目标章节索引在列表中的位置相近）
+      if (target.index > 0 && c.index > 0) {
+        final posDiff = (target.index - c.index).abs();
+        if (posDiff == 0) score += 15;
+        else if (posDiff <= 2) score += 8;
+        else if (posDiff <= 5) score += 3;
+      }
+
+      if (score > 0) {
+        candidates.add(_ChapterCandidate(c, score));
+      }
     }
-    // 子串匹配（处理"第十章" vs "第10章"等差异）
-    for (final c in toc) {
-      final n = _normalize(c.name);
-      if (n.isEmpty) continue;
-      if (n.contains(targetName) || targetName.contains(n)) return c;
+
+    if (candidates.isEmpty) return null;
+
+    // 按分数降序排序，取最高分
+    candidates.sort((a, b) => b.score.compareTo(a.score));
+
+    // 最低及格分：30（避免弱匹配误判）
+    if (candidates.first.score < 30) return null;
+
+    return candidates.first.chapter;
+  }
+
+  /// 从章节名中解析数字序号。
+  ///
+  /// 支持格式：
+  ///   - "第一章" → 1
+  ///   - "第123章" → 123
+  ///   - "第 123 章 标题" → 123
+  ///   - "123. 标题" → 123
+  ///   - "123、标题" → 123
+  ///   - "第一百二十三章" → 123（中文数字）
+  int? _parseChapterIndex(String name) {
+    if (name.isEmpty) return null;
+
+    // 匹配 "第xxx章" 格式（阿拉伯数字）
+    final nMatch = RegExp(r'第\s*(\d+)\s*[章节回话节]').firstMatch(name);
+    if (nMatch != null) {
+      return int.tryParse(nMatch.group(1)!);
     }
+
+    // 匹配 "第xxx章" 格式（中文数字）
+    final cMatch = RegExp(r'第\s*([零〇一二三四五六七八九十百千万两]+)\s*[章节回话节]').firstMatch(name);
+    if (cMatch != null) {
+      return _chineseNumberToInt(cMatch.group(1)!);
+    }
+
+    // 匹配 "123." 或 "123、" 开头
+    final pMatch = RegExp(r'^\s*(\d+)\s*[.、\s]').firstMatch(name);
+    if (pMatch != null) {
+      return int.tryParse(pMatch.group(1)!);
+    }
+
     return null;
+  }
+
+  static const _cnDigitMap = <String, int>{
+    '零': 0, '〇': 0,
+    '一': 1, '二': 2, '两': 2, '三': 3, '四': 4,
+    '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
+  };
+  static const _cnUnitMap = <String, int>{
+    '十': 10, '百': 100, '千': 1000, '万': 10000,
+  };
+
+  /// 中文数字转整数（支持到万以内，如"一百二十三"→123）。
+  int? _chineseNumberToInt(String s) {
+    if (s.isEmpty) return null;
+    int total = 0;
+    int current = 0;
+    bool hasUnit = false;
+
+    for (int i = 0; i < s.length; i++) {
+      final ch = s[i];
+      if (_cnDigitMap.containsKey(ch)) {
+        current = _cnDigitMap[ch]!;
+        if (i == s.length - 1) total += current;
+      } else if (_cnUnitMap.containsKey(ch)) {
+        final unit = _cnUnitMap[ch]!;
+        if (current == 0) current = 1; // "十三" → 13
+        total += current * unit;
+        current = 0;
+        hasUnit = true;
+      }
+    }
+    if (!hasUnit && current > 0) return current; // 单个数字
+    return total > 0 ? total : null;
   }
 
   String _normalize(String s) {
@@ -99,6 +212,13 @@ class CrossSourceContentResolver {
         .replaceAll(RegExp(r'[，。、,.\[\]【】()（）]'), '')
         .toLowerCase();
   }
+}
+
+/// 章节匹配候选，用于评分排序。
+class _ChapterCandidate {
+  final Chapter chapter;
+  final int score;
+  _ChapterCandidate(this.chapter, this.score);
 }
 
 /// 解析结果：包含切换后的源信息 + 章节信息 + 正文 + 完整目录。

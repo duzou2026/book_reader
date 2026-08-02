@@ -567,6 +567,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
   }
 
   /// 切换 TTS：停止→朗读 / 朗读→暂停 / 暂停→恢复。
+  ///
+  /// 每次启动/恢复朗读时重置自动跟随，确保用户点击朗读按钮后
+  /// 文本会自动跟随朗读进度滚动（用户手动滚动后会暂停跟随）。
   Future<void> _toggleTts() async {
     final tts = ref.read(ttsServiceProvider);
     final prefs = ref.read(readingPrefsProvider);
@@ -575,6 +578,8 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
         tts.pause();
         break;
       case TtsPlayState.paused:
+        // 恢复朗读时重置自动跟随
+        _autoFollowTts = true;
         tts.resume();
         break;
       case TtsPlayState.stopped:
@@ -588,6 +593,9 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
         // 自动阅读暂停，避免冲突
         _stopAutoRead();
         _syncTtsVoice();
+        // 启动朗读时重置自动跟随 + 进度
+        _autoFollowTts = true;
+        _ttsProgress = 0.0;
         tts.speak(
           text,
           rate: prefs.ttsRate,

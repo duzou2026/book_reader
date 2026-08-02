@@ -32,6 +32,32 @@ class ContentValidator {
     '次数用尽',
     '今日已达上限',
     '访问频繁',
+    // 更多反爬/限流提示
+    '访问过于频繁',
+    '人机验证',
+    '请完成验证',
+    '请输入验证码',
+    '安全验证',
+    '访问受限',
+    '请求过多',
+    '请求过于频繁',
+    '检测到异常访问',
+    '请稍后再试',
+    '系统繁忙',
+    '服务器繁忙',
+    '当前访问人数较多',
+    '被防火墙拦截',
+    '拒绝访问',
+    'access denied',
+    'too many requests',
+    // 更多付费/登录提示变体
+    '余额不足',
+    '书币不足',
+    '需要订阅',
+    '需要购买',
+    '仅限会员',
+    '会员专享',
+    '需开通会员',
   ];
 
   /// 反爬验证页特征正则。
@@ -42,6 +68,28 @@ class ContentValidator {
   static final _antiCrawlPatterns = [
     RegExp(r'var\s+buid'),
     RegExp(r'<title>\s*(验证|blocked|verify|安全验证)', caseSensitive: false),
+    // Cloudflare 5秒盾 / 挑战页
+    RegExp(r'challenges\.cloudflare\.com', caseSensitive: false),
+    RegExp(r'cloudflare-static', caseSensitive: false),
+    RegExp(r'_cf_chl_opt', caseSensitive: false),
+    RegExp(r'cf-turnstile', caseSensitive: false),
+    RegExp(r'<title>\s*[^<]*Cloudflare', caseSensitive: false),
+    // 5秒盾/盾云/盾安全
+    RegExp(r'5\s*秒.*盾', caseSensitive: false),
+    RegExp(r'shield\.js', caseSensitive: false),
+    RegExp(r'jxdun\.com', caseSensitive: false),
+    // reCAPTCHA / hCaptcha
+    RegExp(r'google\.com/recaptcha', caseSensitive: false),
+    RegExp(r'hcaptcha\.com', caseSensitive: false),
+    // JS 重定向验证（window.location）
+    RegExp(r'window\.location\s*=.*verify', caseSensitive: false),
+    RegExp(r'setTimeout.*location', caseSensitive: false),
+    // HTTP 503 维护页
+    RegExp(r'<title>\s*503', caseSensitive: false),
+    RegExp(r'service\s*unavailable', caseSensitive: false),
+    // DDoS 保护页
+    RegExp(r'ddos.*protection', caseSensitive: false),
+    RegExp(r'anti.*bot', caseSensitive: false),
   ];
 
   /// 有效正文的最小长度（字符数）。

@@ -371,19 +371,32 @@ class SingleSourceSearcher {
 
   /// 检测响应是否为反爬验证页。
   ///
-  /// 特征：短响应（<2KB）+ 含 JS 验证标识（'var buid' / 'verify' / 'blocked'）。
-  /// 起点等站点对无 Cookie 请求返回 HTTP 202 + 209 字节的 JS 验证页，
-  /// 而非真正的搜索结果 HTML。
+  /// 起点等站点对无 Cookie 请求返回 JS 验证页，Cloudflare/5秒盾等
+  /// 也会返回验证页。命中任一特征即视为无效搜索响应。
   static final _antiCrawlPatterns = [
     RegExp(r'var\s+buid'),
     RegExp(r'<title>\s*(验证|blocked|verify|安全验证)', caseSensitive: false),
+    // Cloudflare 5秒盾 / 挑战页
+    RegExp(r'challenges\.cloudflare\.com', caseSensitive: false),
+    RegExp(r'cloudflare-static', caseSensitive: false),
+    RegExp(r'_cf_chl_opt', caseSensitive: false),
+    RegExp(r'cf-turnstile', caseSensitive: false),
+    // 5秒盾
+    RegExp(r'5\s*秒.*盾', caseSensitive: false),
+    RegExp(r'shield\.js', caseSensitive: false),
+    // CAPTCHA
+    RegExp(r'google\.com/recaptcha', caseSensitive: false),
+    RegExp(r'hcaptcha\.com', caseSensitive: false),
+    // 503 / 不可用
+    RegExp(r'<title>\s*503', caseSensitive: false),
+    RegExp(r'service\s*unavailable', caseSensitive: false),
   ];
 
   bool _isAntiCrawlPage(String body) {
-    // 反爬验证页通常很短（< 2KB），真搜索结果一般 > 10KB
-    if (body.length > 2048) return false;
+    // 前 4KB 通常包含 title / script 等验证特征，避免扫描整页大响应
+    final head = body.length > 4096 ? body.substring(0, 4096) : body;
     for (final p in _antiCrawlPatterns) {
-      if (p.hasMatch(body)) return true;
+      if (p.hasMatch(head)) return true;
     }
     return false;
   }

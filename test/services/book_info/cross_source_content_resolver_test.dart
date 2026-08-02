@@ -205,7 +205,7 @@ void main() {
       expect(result, isNull);
     });
 
-    test('matches chapter by substring when exact name differs', () async {
+    test('matches chapter by index when name uses chinese vs arabic numerals', () async {
       final fetcher = _FakeFetcher({
         'https://b.com/toc': '''
           <ul class="chapter-list">
@@ -224,8 +224,7 @@ void main() {
       );
 
       // 目标章节名"第十章"，备选源为"第10章 风起"
-      // 归一化后"第十章"vs"第10章风起"，子串匹配应失败（数字 vs 中文数字）
-      // 但本测试演示跨源章节名不同时返回 null（提醒用户名匹配的局限）
+      // 章节序号解析：第十章→10，第10章→10，序号匹配成功
       final result = await resolver.resolve(
         chapter: Chapter(name: '第十章', url: '', index: 10),
         alternatives: [
@@ -237,8 +236,9 @@ void main() {
           ),
         ],
       );
-      // 数字/中文数字不匹配，预期 null
-      expect(result, isNull);
+      // 序号匹配（中文数字 vs 阿拉伯数字），预期成功匹配
+      expect(result, isNotNull);
+      expect(result!.content, contains('这是真实正文'));
     });
 
     test('respects priority order of alternatives', () async {
