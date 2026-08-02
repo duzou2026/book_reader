@@ -117,6 +117,26 @@ class FlutterTtsService implements TtsService {
   }
 
   @override
+  void setRate(double rate) {
+    _currentRate = rate.clamp(0.5, 2.0);
+    unawaited(() async {
+      try {
+        await _tts.setSpeechRate(_normalizeRate(_currentRate));
+      } catch (_) {}
+    }());
+  }
+
+  @override
+  void setPitch(double pitch) {
+    _currentPitch = pitch.clamp(0.5, 2.0);
+    unawaited(() async {
+      try {
+        await _tts.setPitch(_currentPitch);
+      } catch (_) {}
+    }());
+  }
+
+  @override
   void pause() {
     if (_state != TtsPlayState.speaking) return;
     unawaited(() async {

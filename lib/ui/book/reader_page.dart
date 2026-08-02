@@ -522,6 +522,50 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
     );
   }
 
+  /// TTS 快捷调节滑块：显示图标+标签+当前值，拖动时实时生效。
+  Widget _buildTtsSlider({
+    required IconData icon,
+    required String label,
+    required double value,
+    required double min,
+    required double max,
+    required Color color,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color.withOpacity(0.6)),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(fontSize: 11, color: color.withOpacity(0.6)),
+        ),
+        Expanded(
+          child: SliderTheme(
+            data: SliderThemeData(
+              trackHeight: 2,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+              activeTrackColor: Colors.teal,
+              inactiveTrackColor: color.withOpacity(0.15),
+              thumbColor: Colors.teal,
+            ),
+            child: Slider(
+              value: value,
+              min: min,
+              max: max,
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+        Text(
+          value.toStringAsFixed(1),
+          style: TextStyle(fontSize: 11, color: color.withOpacity(0.6)),
+        ),
+      ],
+    );
+  }
+
   /// 跟随系统夜间模式：若开启且系统为深色，自动切到夜间背景。
   _Bg _resolveBackground(ReadingPrefs prefs, Brightness platformBrightness) {
     final idx = (prefs.followSystemDark && platformBrightness == Brightness.dark)
@@ -937,6 +981,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
   @override
   Widget build(BuildContext context) {
     final prefs = ref.watch(readingPrefsProvider);
+    final tts = ref.read(ttsServiceProvider);
     final platformBrightness = MediaQuery.platformBrightnessOf(context);
     final bg = _resolveBackground(prefs, platformBrightness);
     final isOnSwitchedSource =
@@ -1080,49 +1125,88 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
                         color: bg.foreground.withOpacity(0.08), width: 0.5),
                   ),
                 ),
-                child: Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      '${_currentIndex + 1}/${_currentChapters.length}',
-                      style: TextStyle(
-                          fontSize: 11, color: bg.foreground.withOpacity(0.6)),
-                    ),
-                    // TTS 自动跟随状态指示
                     if (_ttsState != TtsPlayState.stopped) ...[
-                      const SizedBox(width: 6),
-                      Icon(
-                        _autoFollowTts
-                            ? Icons.my_location
-                            : Icons.location_off,
-                        size: 12,
-                        color: _autoFollowTts
-                            ? Colors.teal
-                            : bg.foreground.withOpacity(0.4),
+                      _buildTtsSlider(
+                        icon: Icons.speed,
+                        label: '语速',
+                        value: prefs.ttsRate,
+                        min: 0.5,
+                        max: 2.0,
+                        color: bg.foreground,
+                        onChanged: (v) {
+                          ref
+                              .read(readingPrefsProvider.notifier)
+                              .setTtsRate(v);
+                          tts.setRate(v);
+                        },
                       ),
+                      const SizedBox(height: 2),
+                      _buildTtsSlider(
+                        icon: Icons.music_note,
+                        label: '音调',
+                        value: prefs.ttsPitch,
+                        min: 0.5,
+                        max: 2.0,
+                        color: bg.foreground,
+                        onChanged: (v) {
+                          ref
+                              .read(readingPrefsProvider.notifier)
+                              .setTtsPitch(v);
+                          tts.setPitch(v);
+                        },
+                      ),
+                      const SizedBox(height: 4),
                     ],
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: _ttsState != TtsPlayState.stopped
-                              ? _ttsProgress
-                              : progressPercent,
-                          minHeight: 3,
-                          backgroundColor: bg.foreground.withOpacity(0.1),
-                          valueColor: AlwaysStoppedAnimation(
-                            _ttsState != TtsPlayState.stopped
+                    Row(
+                      children: [
+                        Text(
+                          '${_currentIndex + 1}/${_currentChapters.length}',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: bg.foreground.withOpacity(0.6)),
+                        ),
+                        // TTS 自动跟随状态指示
+                        if (_ttsState != TtsPlayState.stopped) ...[
+                          const SizedBox(width: 6),
+                          Icon(
+                            _autoFollowTts
+                                ? Icons.my_location
+                                : Icons.location_off,
+                            size: 12,
+                            color: _autoFollowTts
                                 ? Colors.teal
-                                : bg.foreground.withOpacity(0.5),
+                                : bg.foreground.withOpacity(0.4),
+                          ),
+                        ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: _ttsState != TtsPlayState.stopped
+                                  ? _ttsProgress
+                                  : progressPercent,
+                              minHeight: 3,
+                              backgroundColor: bg.foreground.withOpacity(0.1),
+                              valueColor: AlwaysStoppedAnimation(
+                                _ttsState != TtsPlayState.stopped
+                                    ? Colors.teal
+                                    : bg.foreground.withOpacity(0.5),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '已读 ${_formatReadingTime(_readingSeconds)}',
-                      style: TextStyle(
-                          fontSize: 11, color: bg.foreground.withOpacity(0.6)),
+                        const SizedBox(width: 8),
+                        Text(
+                          '已读 ${_formatReadingTime(_readingSeconds)}',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: bg.foreground.withOpacity(0.6)),
+                        ),
+                      ],
                     ),
                   ],
                 ),

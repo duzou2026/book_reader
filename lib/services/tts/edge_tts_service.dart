@@ -50,6 +50,9 @@ class EdgeTtsService implements TtsService {
   /// 当前发音人 shortName。
   String _voice;
 
+  /// 最近设置的音调，供下次朗读使用。
+  double _pitch = 1.0;
+
   /// 合成任务，用于取消上一次未完成的合成。
   Future<void>? _synthTask;
 
@@ -107,7 +110,21 @@ class EdgeTtsService implements TtsService {
     // 取消上一次未完成的合成
     _synthTask?.ignore();
     stop();
+    _pitch = pitch;
     _synthTask = _speakInternal(text, rate, pitch);
+  }
+
+  @override
+  void setRate(double rate) {
+    if (_disposed) return;
+    try {
+      _player.setSpeed(rate.clamp(0.5, 2.0));
+    } catch (_) {}
+  }
+
+  @override
+  void setPitch(double pitch) {
+    _pitch = pitch.clamp(0.5, 2.0);
   }
 
   Future<void> _speakInternal(String text, double rate, double pitch) async {

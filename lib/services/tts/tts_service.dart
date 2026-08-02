@@ -42,6 +42,12 @@ abstract class TtsService {
   /// [text] 待朗读文本，[rate] 语速 0.5-2.0，[pitch] 音调 0.5-2.0。
   void speak(String text, {double rate = 1.0, double pitch = 1.0});
 
+  /// 动态调整语速（0.5-2.0），朗读中可实时生效。
+  void setRate(double rate);
+
+  /// 调整音调（0.5-2.0），保存后下次朗读生效。
+  void setPitch(double pitch);
+
   /// 暂停朗读。
   void pause();
 
@@ -79,6 +85,12 @@ class NoOpTtsService implements TtsService {
   void speak(String text, {double rate = 1.0, double pitch = 1.0}) {
     onError?.call('当前平台不支持 TTS 朗读');
   }
+
+  @override
+  void setRate(double rate) {}
+
+  @override
+  void setPitch(double pitch) {}
 
   @override
   void pause() {}
