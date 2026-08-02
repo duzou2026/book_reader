@@ -21,7 +21,7 @@ const String kGithubRepo = 'book_reader';
 ///
 /// 注意：每次 bump pubspec.yaml 后需要同步更新这里。
 /// 未来可改用 `package_info_plus` 自动读取，避免手动同步。
-const String kCurrentAppVersion = '0.16.0';
+const String kCurrentAppVersion = '0.17.0';
 
 final appUpdateCheckerProvider = Provider<AppUpdateChecker>((ref) {
   return AppUpdateChecker(
