@@ -119,8 +119,8 @@ class SearchResultTile extends ConsumerWidget {
       addedAt: DateTime.now().millisecondsSinceEpoch,
       lastReadAt: DateTime.now().millisecondsSinceEpoch,
     );
-    final existed = await repo.get(entry.id);
-    if (existed != null && context.mounted) {
+    final existed = await repo.contains(entry.id);
+    if (existed && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已在书架中'), duration: Duration(seconds: 1)),
       );
