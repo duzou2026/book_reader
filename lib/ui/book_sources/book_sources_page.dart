@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:book_reader/app/providers.dart';
 import 'package:book_reader/data/demo_book_sources.dart';
 import 'package:book_reader/data/models/book_source.dart';
+import 'package:book_reader/domain/usecases/test_book_source.dart';
 import 'package:book_reader/services/book_source/book_source_importer.dart';
 import 'package:book_reader/ui/book_sources/book_source_import_dialog.dart';
 import 'package:book_reader/ui/book_sources/book_source_test_sheet.dart';
@@ -201,6 +202,146 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
     );
     // 测试结束后刷新（测试不修改数据，但保持一致）
     if (mounted) setState(_reload);
+  }
+
+  /// 一键测速：并发测试所有已启用书源（最多 8 并发），
+  /// 完成后显示结果汇总，支持一键禁用失败源。
+  Future<void> _batchTestSources() async {
+    if (_batchTesting) return;
+    final enabled = _lastList.where((s) => s.enabled).toList();
+    if (enabled.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('没有已启用的书源')),
+      );
+      return;
+    }
+    setState(() {
+      _batchTesting = true;
+      _batchTestCompleted = 0;
+      _batchTestTotal = enabled.length;
+      _batchTestResults.clear();
+    });
+
+    final tester = ref.read(testBookSourceProvider);
+    const concurrency = 8;
+    var index = 0;
+
+    Future<void> worker() async {
+      while (true) {
+        int? idx;
+        if (mounted) {
+          setState(() {
+            if (index < enabled.length) {
+              idx = index++;
+            }
+          });
+        }
+        if (idx == null) break;
+        final source = enabled[idx!];
+        try {
+          final result = await tester.call(source).timeout(
+            const Duration(seconds: 45),
+          );
+          if (mounted) {
+            setState(() {
+              _batchTestResults[source.bookSourceUrl] = result.overallStatus;
+              _batchTestCompleted++;
+            });
+          }
+        } catch (_) {
+          if (mounted) {
+            setState(() {
+              _batchTestResults[source.bookSourceUrl] = TestOverallStatus.fail;
+              _batchTestCompleted++;
+            });
+          }
+        }
+      }
+    }
+
+    final workers = List.generate(
+      concurrency.clamp(1, enabled.length),
+      (_) => worker(),
+    );
+    await Future.wait(workers);
+
+    if (!mounted) return;
+    setState(() => _batchTesting = false);
+
+    final ok = _batchTestResults.values
+        .where((s) => s == TestOverallStatus.ok)
+        .length;
+    final partial = _batchTestResults.values
+        .where((s) => s == TestOverallStatus.partial)
+        .length;
+    final fail = _batchTestResults.values
+        .where((s) => s == TestOverallStatus.fail)
+        .length;
+
+    // 显示结果对话框
+    final disableFails = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('测速完成', style: TextStyle(fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _resultRow('✅ 全部通过', ok, Colors.green),
+            _resultRow('⚠️ 部分通过', partial, Colors.orange),
+            _resultRow('❌ 失败', fail, Colors.red),
+            const SizedBox(height: 12),
+            Text(
+              '共测试 ${_batchTestTotal} 个书源',
+              style: TextStyle(color: ThemeColors.mutedText(ctx), fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('关闭'),
+          ),
+          if (fail > 0)
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text('一键禁用 $fail 个失败源'),
+            ),
+        ],
+      ),
+    );
+
+    if (disableFails == true && mounted) {
+      final repo = ref.read(bookSourceRepositoryProvider);
+      var count = 0;
+      for (final s in enabled) {
+        if (_batchTestResults[s.bookSourceUrl] == TestOverallStatus.fail) {
+          await repo.setEnabled(s.bookSourceUrl, false);
+          count++;
+        }
+      }
+      setState(_reload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已禁用 $count 个失败书源')),
+      );
+    }
+  }
+
+  Widget _resultRow(String label, int count, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Text(label, style: TextStyle(fontSize: 13, color: color)),
+          const Spacer(),
+          Text('$count',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: color)),
+        ],
+      ),
+    );
   }
 
   void _enterSelectMode(String url) {
@@ -538,6 +679,11 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
               ]
             : [
                 IconButton(
+                  icon: const Icon(Icons.speed_outlined),
+                  onPressed: _lastList.isEmpty ? null : _batchTestSources,
+                  tooltip: '一键测速',
+                ),
+                IconButton(
                   icon: const Icon(Icons.create_new_folder_outlined),
                   onPressed: () => _openEdit(),
                   tooltip: '新建书源',
@@ -766,6 +912,12 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
 
   /// 缓存最近一次加载的全量列表，供 AppBar action 操作使用。
   List<BookSource> _lastList = const [];
+
+  /// 批量测速状态。
+  bool _batchTesting = false;
+  int _batchTestCompleted = 0;
+  int _batchTestTotal = 0;
+  final Map<String, TestOverallStatus> _batchTestResults = {};
 
   List<BookSource> _filteredList(List<BookSource> all) {
     var list = all;
