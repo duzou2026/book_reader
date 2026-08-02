@@ -560,7 +560,8 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                                 ],
                                 if (wordCount != null) ...[
                                   const SizedBox(height: 8),
-                                  Text('$wordCount · 共 ${_chapters.length} 章',
+                                  Text(
+                                      '$wordCount · 共 ${_chapters.length} 章 · ${widget.searchResult.sources.length} 个源',
                                       style: TextStyle(
                                           color: ThemeColors.mutedText(context),
                                           fontSize: 12)),
