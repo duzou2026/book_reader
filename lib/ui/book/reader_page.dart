@@ -1503,6 +1503,7 @@ class _ChapterDrawer extends StatefulWidget {
 class _ChapterDrawerState extends State<_ChapterDrawer> {
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
+  final _currentKey = GlobalKey();
   String _keyword = '';
 
   @override
@@ -1516,18 +1517,18 @@ class _ChapterDrawerState extends State<_ChapterDrawer> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.currentIndex >= 0 &&
-          widget.currentIndex < widget.chapters.length) {
-        final itemHeight = 56.0;
-        final offset = widget.currentIndex * itemHeight -
-            _scrollController.position.viewportDimension / 2;
-        if (offset > 0) {
-          _scrollController.jumpTo(offset.clamp(
-            0.0,
-            _scrollController.position.maxScrollExtent,
-          ));
+      // 等待列表布局完成后滚动到当前章节
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _currentKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
         }
-      }
+      });
     });
   }
 
@@ -1616,6 +1617,7 @@ class _ChapterDrawerState extends State<_ChapterDrawer> {
                 final originalIndex = ic.originalIndex;
                 final isCurrent = originalIndex == widget.currentIndex;
                 return ListTile(
+                  key: isCurrent ? _currentKey : null,
                   dense: true,
                   selected: isCurrent,
                   selectedTileColor:
