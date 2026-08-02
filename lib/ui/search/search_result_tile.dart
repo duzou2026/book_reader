@@ -1,19 +1,23 @@
+import 'package:book_reader/app/providers.dart';
+import 'package:book_reader/data/bookshelf_repository.dart';
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/ui/common/theme_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class SearchResultTile extends StatelessWidget {
+class SearchResultTile extends ConsumerWidget {
   final SearchResult result;
   const SearchResultTile({super.key, required this.result});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cover = result.coverUrl;
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: InkWell(
         onTap: () => context.push('/book', extra: result),
+        onLongPress: () => _addToShelf(context, ref),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -95,6 +99,49 @@ class SearchResultTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _addToShelf(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(bookshelfRepositoryProvider);
+    final s = result.sources.first;
+    final entry = BookshelfEntry(
+      id: '${result.bookName}|${result.author}'.hashCode.toString(),
+      bookName: result.bookName,
+      author: result.author,
+      coverUrl: result.coverUrl,
+      intro: result.intro,
+      kind: result.kind,
+      wordCount: result.wordCount,
+      lastChapter: result.lastChapter,
+      sourceName: s.sourceName,
+      sourceUrl: s.sourceUrl,
+      bookUrl: s.bookUrl,
+      addedAt: DateTime.now().millisecondsSinceEpoch,
+      lastReadAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    final existed = await repo.get(entry.id);
+    if (existed != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已在书架中'), duration: Duration(seconds: 1)),
+      );
+      return;
+    }
+    await repo.upsert(entry);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已加入书架：${result.bookName}'),
+          duration: const Duration(seconds: 1),
+          action: SnackBarAction(
+            label: '查看',
+            onPressed: () {
+              while (context.canPop()) context.pop();
+              context.go('/shelf');
+            },
+          ),
+        ),
+      );
+    }
   }
 
   Widget _coverPlaceholder(BuildContext context) {

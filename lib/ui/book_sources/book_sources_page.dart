@@ -43,6 +43,9 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
   /// 当前分组筛选（null = 全部，'' = 未分组）。
   String? _selectedGroup;
 
+  /// 状态筛选：null=全部，true=仅启用，false=仅禁用。
+  bool? _statusFilter;
+
   @override
   void initState() {
     super.initState();
@@ -791,6 +794,26 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                   ),
                 ),
               ),
+              // 状态筛选条
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                child: Row(
+                  children: [
+                    _statusChip(null, '全部', _lastList.length),
+                    const SizedBox(width: 6),
+                    _statusChip(
+                        true,
+                        '已启用',
+                        _lastList.where((s) => s.enabled).length),
+                    const SizedBox(width: 6),
+                    _statusChip(
+                        false,
+                        '已禁用',
+                        _lastList.where((s) => !s.enabled).length),
+                  ],
+                ),
+              ),
               // 分组筛选条
               if (groups.isNotEmpty)
                 SizedBox(
@@ -921,6 +944,9 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
 
   List<BookSource> _filteredList(List<BookSource> all) {
     var list = all;
+    if (_statusFilter != null) {
+      list = list.where((s) => s.enabled == _statusFilter).toList();
+    }
     if (_selectedGroup != null) {
       if (_selectedGroup!.isEmpty) {
         list = list.where((s) => (s.bookSourceGroup ?? '').isEmpty).toList();
@@ -948,6 +974,22 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
           _selectedGroup = selected ? null : key;
         }),
       ),
+    );
+  }
+
+  Widget _statusChip(bool? key, String label, int count) {
+    final selected = _statusFilter == key;
+    Color? color;
+    if (key == true) color = Colors.green;
+    if (key == false) color = Colors.grey;
+    return FilterChip(
+      label: Text('$label ($count)'),
+      selected: selected,
+      selectedColor: color?.withOpacity(0.15),
+      checkmarkColor: color,
+      onSelected: (_) => setState(() {
+        _statusFilter = selected ? null : key;
+      }),
     );
   }
 }
