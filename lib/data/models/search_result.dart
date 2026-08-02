@@ -45,11 +45,13 @@ extension SearchResultX on SearchResult {
   ///   - name 和 author 都 toLowerCase()
   ///   - 去前后空白
   ///   - 内部连续空白合并为单个空格
+  ///   - 作者名去除「著/编/撰/作者：/著：」等常见后缀/前缀
+  ///   - 书名去除标点符号，避免「凡人修仙传」vs「凡人修仙传·」被识别为不同
   ///
   /// 这样「三体」/「  三体 」/「三  体」都会归一化到相同的 key。
   String get dedupKey {
-    final n = _normalize(bookName);
-    final a = _normalize(author);
+    final n = _normalizeBookName(bookName);
+    final a = _normalizeAuthor(author);
     return '$n|$a';
   }
 
@@ -67,5 +69,23 @@ extension SearchResultX on SearchResult {
 
   static String _normalize(String s) {
     return s.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  static String _normalizeBookName(String s) {
+    var n = _normalize(s);
+    // 去除常见标点符号
+    n = n.replaceAll(RegExp(r'[·•\-—_:：,，。！!？?~～""''\[\]【】《》<>()（）]'), '');
+    // 去除常见后缀如「全文阅读」「最新章节」
+    n = n.replaceAll(RegExp(r'(全文阅读|最新章节|txt下载|完整版)$'), '');
+    return n.trim();
+  }
+
+  static String _normalizeAuthor(String s) {
+    var a = _normalize(s);
+    // 去除前缀
+    a = a.replaceAll(RegExp(r'^(作者[:：]?|作者：?)'), '');
+    // 去除后缀
+    a = a.replaceAll(RegExp(r'[著编撰译写]+\s*$'), '');
+    return a.trim();
   }
 }

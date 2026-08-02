@@ -102,6 +102,12 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
   /// 当前章节是否已加入书签。
   bool _isBookmarked = false;
 
+  /// 章节内容预加载缓存：key = 章节索引，value = 预加载的解析结果。
+  final Map<int, ResolvedContent> _preloadCache = {};
+
+  /// 正在预加载的章节索引，避免重复预加载。
+  final Set<int> _preloading = <int>{};
+
   /// 章节字数（用于统计）。
   int _chapterWordCount = 0;
 
@@ -227,12 +233,19 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
       _switchPromptedForCurrent = false;
     });
     try {
-      final useCase = ref.read(resolveChapterContentProvider);
-      final resolved = await useCase(
-        book: _currentBook,
-        chapter: _currentChapter,
-        alternatives: _buildAlternatives(),
-      );
+      ResolvedContent resolved;
+      // 优先从预加载缓存中读取
+      final preloaded = _preloadCache.remove(_currentIndex);
+      if (preloaded != null) {
+        resolved = preloaded;
+      } else {
+        final useCase = ref.read(resolveChapterContentProvider);
+        resolved = await useCase(
+          book: _currentBook,
+          chapter: _currentChapter,
+          alternatives: _buildAlternatives(),
+        );
+      }
       if (!mounted) return;
       // 同步加载本章笔记和书签状态
       final notesRepo = ref.read(noteRepositoryProvider);
@@ -273,6 +286,8 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
       }
       // 持久化进度
       _persistProgress();
+      // 后台预加载下一章内容
+      _preloadNext();
       // 若跨源成功且尚未切换过 → 弹窗询问
       if (resolved.switchedTo != null && !_switchPromptedForCurrent) {
         _switchPromptedForCurrent = true;
@@ -294,6 +309,41 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
     if (text == null || text.isEmpty) return 0;
     final cleaned = text.replaceAll(RegExp(r'\s+'), '');
     return cleaned.length;
+  }
+
+  /// 后台预加载后续章节（下一章 + 下下章）。
+  void _preloadNext() {
+    if (!mounted) return;
+    final next = _currentIndex + 1;
+    final nextNext = _currentIndex + 2;
+    if (next < _currentChapters.length) _preloadChapter(next);
+    if (nextNext < _currentChapters.length) _preloadChapter(nextNext);
+  }
+
+  /// 预加载指定章节内容到缓存。
+  Future<void> _preloadChapter(int index) async {
+    if (index < 0 || index >= _currentChapters.length) return;
+    if (_preloading.contains(index) || _preloadCache.containsKey(index)) return;
+    _preloading.add(index);
+    try {
+      final useCase = ref.read(resolveChapterContentProvider);
+      final resolved = await useCase(
+        book: _currentBook,
+        chapter: _currentChapters[index],
+        alternatives: _buildAlternatives(),
+      );
+      if (!mounted) return;
+      _preloadCache[index] = resolved;
+      // 缓存上限：最多保留 5 章，超出则淘汰最旧的
+      if (_preloadCache.length > 5) {
+        final keys = _preloadCache.keys.toList()..sort();
+        _preloadCache.remove(keys.first);
+      }
+    } catch (_) {
+      // 预加载失败静默处理，不影响当前阅读
+    } finally {
+      _preloading.remove(index);
+    }
   }
 
   /// 构造跨源备选列表：去除当前生效源。
