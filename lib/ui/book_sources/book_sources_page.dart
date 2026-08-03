@@ -756,6 +756,35 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
             ..sort();
           return Column(
             children: [
+              // 批量测速进度条
+              if (_batchTesting)
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: _batchTestTotal == 0
+                                ? null
+                                : _batchTestCompleted / _batchTestTotal,
+                            minHeight: 6,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '测速中 $_batchTestCompleted/$_batchTestTotal',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: ThemeColors.mutedText(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               // 统计 + 搜索框
               Padding(
                 padding:
@@ -853,11 +882,14 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                         itemBuilder: (context, i) {
                           final s = list[i];
                           final selected = _selected.contains(s.bookSourceUrl);
+                          final testStatus = _testStatusOf(s.bookSourceUrl);
                           return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 4),
                             onLongPress: () => _enterSelectMode(s.bookSourceUrl),
                             onTap: _selectMode
                                 ? () => _toggleSelect(s.bookSourceUrl)
-                                : null,
+                                : () => _openEdit(s),
                             leading: _selectMode
                                 ? Icon(
                                     selected
@@ -867,17 +899,34 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                                         ? Theme.of(context).colorScheme.primary
                                         : ThemeColors.mutedText(context),
                                   )
-                                : null,
-                            title: Text(s.bookSourceName),
+                                : _StatusDot(status: testStatus),
+                            title: Text(
+                              s.bookSourceName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: s.enabled
+                                    ? null
+                                    : ThemeColors.mutedText(context),
+                              ),
+                            ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(s.bookSourceUrl,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 2),
+                                Text(
+                                  s.bookSourceUrl,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: ThemeColors.mutedText(context),
+                                  ),
+                                ),
                                 if ((s.bookSourceGroup ?? '').isNotEmpty)
                                   Padding(
-                                    padding: const EdgeInsets.only(top: 2),
+                                    padding: const EdgeInsets.only(top: 4),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 6, vertical: 1),
@@ -899,26 +948,55 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                                 : Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      IconButton(
-                                        tooltip: '编辑',
-                                        icon: const Icon(Icons.edit_outlined,
-                                            size: 20),
-                                        onPressed: () => _openEdit(s),
-                                      ),
-                                      IconButton(
-                                        tooltip: '测试',
-                                        icon: const Icon(Icons.bug_report_outlined,
-                                            size: 20),
-                                        onPressed: () => _testSource(s),
-                                      ),
                                       Switch(
                                         value: s.enabled,
                                         onChanged: (v) => _toggle(s, v),
                                       ),
-                                      IconButton(
-                                        icon:
-                                            const Icon(Icons.delete_outline),
-                                        onPressed: () => _delete(s),
+                                      PopupMenuButton<String>(
+                                        tooltip: '更多',
+                                        icon: const Icon(Icons.more_vert),
+                                        onSelected: (v) {
+                                          switch (v) {
+                                            case 'edit':
+                                              _openEdit(s);
+                                              break;
+                                            case 'test':
+                                              _testSource(s);
+                                              break;
+                                            case 'delete':
+                                              _delete(s);
+                                              break;
+                                          }
+                                        },
+                                        itemBuilder: (context) => const [
+                                          PopupMenuItem(
+                                            value: 'edit',
+                                            child: ListTile(
+                                              dense: true,
+                                              leading: Icon(
+                                                  Icons.edit_outlined),
+                                              title: Text('编辑'),
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'test',
+                                            child: ListTile(
+                                              dense: true,
+                                              leading: Icon(Icons
+                                                  .bug_report_outlined),
+                                              title: Text('测试'),
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'delete',
+                                            child: ListTile(
+                                              dense: true,
+                                              leading: Icon(
+                                                  Icons.delete_outline),
+                                              title: Text('删除'),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
@@ -941,6 +1019,9 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
   int _batchTestCompleted = 0;
   int _batchTestTotal = 0;
   final Map<String, TestOverallStatus> _batchTestResults = {};
+
+  /// 返回书源最近一次测速状态（无记录返回 null）。
+  TestOverallStatus? _testStatusOf(String url) => _batchTestResults[url];
 
   List<BookSource> _filteredList(List<BookSource> all) {
     var list = all;
@@ -990,6 +1071,35 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
       onSelected: (_) => setState(() {
         _statusFilter = selected ? null : key;
       }),
+    );
+  }
+}
+
+/// 书源测速状态点：绿=通过，橙=部分通过，红=失败，灰=未测试。
+class _StatusDot extends StatelessWidget {
+  const _StatusDot({this.status});
+
+  final TestOverallStatus? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, tooltip) = switch (status) {
+      TestOverallStatus.ok => (Colors.green, '测速通过'),
+      TestOverallStatus.partial => (Colors.orange, '部分通过'),
+      TestOverallStatus.fail => (Colors.red, '测速失败'),
+      null => (ThemeColors.mutedText(context).withOpacity(0.4), '未测试'),
+    };
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        width: 12,
+        height: 12,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+        ),
+      ),
     );
   }
 }

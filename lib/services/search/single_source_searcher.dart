@@ -328,15 +328,23 @@ class SingleSourceSearcher {
 
   /// 判断搜索结果是否与关键字相关。
   ///
-  /// 规则：归一化后的「书名」或「作者」任一包含归一化后的关键字即视为相关。
-  /// 这样既能过滤掉书源返回的无关热门书，又不会误伤「按作者搜」的场景。
-  /// 关键字为空（理论上不会发生）时一律放行，避免把所有结果都过滤掉。
+  /// 规则（宽松双向匹配）：
+  ///   1. 归一化后「书名」包含关键字 或 关键字包含书名 → 相关
+  ///      （覆盖"斗破苍穹（全本）"搜"斗破苍穹"、"斗破苍穹"搜"斗破苍穹（全本）"）
+  ///   2. 「作者」包含关键字 → 相关（按作者搜场景）
+  ///   3. 关键字为空 → 放行
+  ///
+  /// 之前只做单向 `name.contains(keyword)`，书源返回带前缀/后缀的书名
+  /// （如"斗破苍穹全文阅读"、"最新章节：斗破苍穹"）时把正常结果误过滤，
+  /// 是"好多书搜不出来"的主因之一。
   static bool _isRelevant(String name, String author, String keywordNorm) {
     if (keywordNorm.isEmpty) return true;
     final n = _normalize(name);
-    if (n.contains(keywordNorm)) return true;
+    if (n.isNotEmpty && (n.contains(keywordNorm) || keywordNorm.contains(n))) {
+      return true;
+    }
     final a = _normalize(author);
-    if (a.contains(keywordNorm)) return true;
+    if (a.isNotEmpty && a.contains(keywordNorm)) return true;
     return false;
   }
 

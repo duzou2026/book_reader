@@ -75,6 +75,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('发现'),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

@@ -81,16 +81,24 @@ enum TestOverallStatus {
 
 /// 书源测试用例：对一个书源执行全链路测试。
 ///
-/// 流程：搜索「测试」关键词 → 取第一条结果 → 拉详情 → 拉目录 → 拉第一章正文。
+/// 流程：搜索（多关键词备选）→ 取第一条结果 → 拉详情 → 拉目录 → 拉第一章正文。
 /// 任意一步失败即终止后续，返回已完成的步骤结果。
+///
+/// 设计要点（修复"书源测试也有问题"）：
+///   - 搜索步骤用**多关键词备选**（斗破苍穹/三体/雪中悍刀行），
+///     单一关键词未收录不代表源不可用，避免大量误判为"搜索无结果→全跳过"
+///   - 搜索步骤明确区分「源本身不可用」(fail) 与「关键词未收录」(skip)
+///   - 正文步骤除判空外，还做最小长度与反爬验证页检测，
+///     避免"返回了验证页/JS 挑战页"被误判为"正文获取成功"
 class TestBookSource {
   final SingleSourceSearcher searcher;
   final BookInfoFetcher bookInfoFetcher;
   final TocFetcher tocFetcher;
   final ContentFetcher contentFetcher;
 
-  /// 测试用关键词。默认「斗破苍穹」（中文小说站点覆盖率较高）。
-  final String testKeyword;
+  /// 测试用关键词（按序尝试，第一个出结果的为准）。
+  /// 覆盖玄幻/科幻/武侠不同题材，提高单源命中率。
+  final List<String> testKeywords;
 
   /// 单步超时。15 秒，兼顾慢站点和网络抖动。
   final Duration stepTimeout;
@@ -100,7 +108,7 @@ class TestBookSource {
     required this.bookInfoFetcher,
     required this.tocFetcher,
     required this.contentFetcher,
-    this.testKeyword = '斗破苍穹',
+    this.testKeywords = const ['斗破苍穹', '三体', '雪中悍刀行'],
     this.stepTimeout = const Duration(seconds: 15),
   });
 
@@ -111,42 +119,20 @@ class TestBookSource {
   }) async {
     final steps = <BookSourceTestStepResult>[];
 
-    // 步骤 1：搜索
-    // 搜索无结果不算失败（书源可能就是没收录这本书），标记为 skip 并终止后续步骤。
-    final searchResult = await _runStep<SearchResult>(
-      name: '搜索',
-      steps: steps,
-      onStep: onStep,
-      action: () async {
-        final list = await searcher
-            .search(testKeyword, source)
-            .timeout(stepTimeout);
-        if (list.isEmpty) {
-          // 搜索无结果：返回 null 触发 skip 路径（非异常）
-          return null;
-        }
-        return list.first;
-      },
-      summarize: (r) =>
-          '找到《${r.bookName}》- ${r.author}（共 ${r.sources.length} 源）',
-      emptyMessage: '未找到「$testKeyword」相关书籍',
-    );
+    // 步骤 1：搜索（多关键词备选，任一命中即通过）
+    final searchResult = await _runSearchStep(source, steps, onStep);
     if (searchResult == null) {
-      // 搜索无结果或失败，后续步骤无法执行
-      // 若搜索步骤本身标记为 skip（非 fail），后续步骤也标记 skip
-      final searchStep = steps.last;
-      if (searchStep.status == TestStepStatus.skip) {
-        for (final name in ['详情', '目录', '正文']) {
-          final step = BookSourceTestStepResult(
-            name: name,
-            ok: false,
-            elapsedMs: 0,
-            message: '前置步骤无结果，已跳过',
-            status: TestStepStatus.skip,
-          );
-          steps.add(step);
-          onStep?.call(step);
-        }
+      // 搜索步骤已记录（skip 或 fail），后续步骤统一标记 skip
+      for (final name in ['详情', '目录', '正文']) {
+        final step = BookSourceTestStepResult(
+          name: name,
+          ok: false,
+          elapsedMs: 0,
+          message: '前置步骤无结果，已跳过',
+          status: TestStepStatus.skip,
+        );
+        steps.add(step);
+        onStep?.call(step);
       }
       return BookSourceTestResult(steps: steps);
     }
@@ -201,7 +187,7 @@ class TestBookSource {
       return BookSourceTestResult(steps: steps);
     }
 
-    // 步骤 4：正文（取第一章）
+    // 步骤 4：正文（取第一章），除判空外还做最小长度与反爬页检测
     await _runStep<String>(
       name: '正文',
       steps: steps,
@@ -214,8 +200,14 @@ class TestBookSource {
         final content = await contentFetcher
             .fetch(firstChapter.url, source)
             .timeout(stepTimeout);
-        if (content.trim().isEmpty) {
+        final trimmed = content.trim();
+        if (trimmed.isEmpty) {
           throw Exception('正文为空');
+        }
+        // 反爬验证页/JS 挑战页误判为"正文成功"是测试不准的重灾区，
+        // 长度太短（<50 字）的内容基本可以判定为无效（验证提示/错误页）。
+        if (trimmed.length < 50) {
+          throw Exception('正文过短（${trimmed.length} 字），疑似验证页或错误页');
         }
         return content;
       },
@@ -223,6 +215,66 @@ class TestBookSource {
     );
 
     return BookSourceTestResult(steps: steps);
+  }
+
+  /// 搜索步骤：多关键词备选，第一个有结果的关键词生效。
+  ///
+  /// 返回命中的第一条 [SearchResult]；全部关键词都无结果返回 null。
+  /// 区分两种失败：
+  ///   - 所有关键词都正常返回但为空 → skip（源可用但没收录这些书）
+  ///   - 全部关键词都抛异常/超时 → fail（源本身不可用）
+  Future<SearchResult?> _runSearchStep(
+    BookSource source,
+    List<BookSourceTestStepResult> steps,
+    void Function(BookSourceTestStepResult)? onStep,
+  ) async {
+    final sw = Stopwatch()..start();
+    var sawException = false;
+    var sawEmpty = false;
+    Object? lastError;
+
+    for (final kw in testKeywords) {
+      try {
+        final list = await searcher.search(kw, source).timeout(stepTimeout);
+        if (list.isNotEmpty) {
+          sw.stop();
+          final r = list.first;
+          final step = BookSourceTestStepResult(
+            name: '搜索',
+            ok: true,
+            elapsedMs: sw.elapsedMilliseconds,
+            message: '找到《${r.bookName}》- ${r.author}（关键词「$kw」）',
+            status: TestStepStatus.ok,
+          );
+          steps.add(step);
+          onStep?.call(step);
+          return r;
+        }
+        sawEmpty = true;
+      } catch (e) {
+        sawException = true;
+        lastError = e;
+        // 当前关键词失败，尝试下一个
+      }
+    }
+    sw.stop();
+
+    // 全部关键词都无结果：区分"源可用但没收录"(skip) 与"源不可用"(fail)
+    // 判定：只要有一个关键词正常返回空（sawEmpty）就视为源可用 → skip；
+    // 全部都是异常（sawException 且无 empty）→ fail。
+    final isSourceDead = sawException && !sawEmpty;
+    final step = BookSourceTestStepResult(
+      name: '搜索',
+      ok: false,
+      elapsedMs: sw.elapsedMilliseconds,
+      message: isSourceDead
+          ? '请求失败：${_formatError(lastError ?? '未知错误')}'
+          : '未找到「${testKeywords.join(' / ')}」相关书籍',
+      status: isSourceDead ? TestStepStatus.fail : TestStepStatus.skip,
+    );
+    steps.add(step);
+    onStep?.call(step);
+    return null;
   }
 
   /// 执行单个步骤，捕获异常并记录耗时。

@@ -225,16 +225,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('搜书'),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.library_books_outlined),
             tooltip: '书源管理',
             onPressed: () => context.push('/book-sources'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: '设置',
-            onPressed: () => context.push('/settings'),
           ),
         ],
       ),
@@ -250,7 +246,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               decoration: InputDecoration(
                 hintText: '输入书名或作者…',
                 prefixIcon: const Icon(Icons.search),
-                border: const OutlineInputBorder(),
+                // border 留空：复用全局 InputDecorationTheme 的圆角填充样式
                 suffixIcon: _loading
                     ? const Padding(
                         padding: EdgeInsets.all(12),

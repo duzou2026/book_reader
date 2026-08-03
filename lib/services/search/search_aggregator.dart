@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:book_reader/data/models/book_source.dart';
 import 'package:book_reader/data/models/search_result.dart';
 import 'package:book_reader/services/search/single_source_searcher.dart';
@@ -32,8 +34,8 @@ class SearchProgress {
 /// 多源并发搜索聚合器。
 ///
 /// 职责：
-///   - 并发跑所有书源的 [SingleSourceSearcher.search]
-///   - 单源超时（默认 12s）→ 该源返回空，不影响其他
+///   - 以固定并发度跑所有书源的 [SingleSourceSearcher.search]
+///   - 单源超时（默认 15s）→ 该源返回空，不影响其他
 ///   - 单源抛异常 → 重试 1 次，仍失败则该源返回空
 ///   - 每个源完成时通过 [onProgress] 回调上报进度
 ///   - 合并所有结果，按 `dedupKey` 去重，相同 key 的合并 `sources` 列表
@@ -42,9 +44,17 @@ class SearchAggregator {
   final SingleSourceSearcher searcher;
   final Duration perSourceTimeout;
 
+  /// 并发度：同时发起搜索的书源数量。
+  ///
+  /// 150+ 书源全并发会同时发起数百个连接，触发操作系统/路由器限流，
+  /// 大量请求在 socket 层排队直至超时，表现为"全部源都超时"。
+  /// 限流后单批请求能快速完成，整体吞吐反而更高。
+  final int concurrency;
+
   SearchAggregator({
     required this.searcher,
-    this.perSourceTimeout = const Duration(seconds: 12),
+    this.perSourceTimeout = const Duration(seconds: 15),
+    this.concurrency = 12,
   });
 
   /// 搜索并聚合结果。
@@ -59,6 +69,7 @@ class SearchAggregator {
     final statusMap = <String, String>{};
     final aggregated = <SearchResult>[];
     var completed = 0;
+    var nextIndex = 0;
 
     void report() {
       onProgress?.call(SearchProgress(
@@ -69,22 +80,29 @@ class SearchAggregator {
       ));
     }
 
-    // 每个源独立 await，完成后即时上报，不等其他源。
-    final futures = sources.map((s) async {
-      List<SearchResult> list;
-      try {
-        list = await _searchWithRetry(keyword, s);
-        statusMap[s.bookSourceName] = list.isEmpty ? 'empty' : 'ok';
-      } catch (_) {
-        list = const <SearchResult>[];
-        statusMap[s.bookSourceName] = 'error';
+    // 固定并发度的 worker 池：每个 worker 循环从队列取下一个源执行，
+    // 避免一次性创建 total 个 future 同时发起网络请求。
+    Future<void> worker() async {
+      while (true) {
+        final i = nextIndex++;
+        if (i >= total) return;
+        final s = sources[i];
+        List<SearchResult> list;
+        try {
+          list = await _searchWithRetry(keyword, s);
+          statusMap[s.bookSourceName] = list.isEmpty ? 'empty' : 'ok';
+        } catch (_) {
+          list = const <SearchResult>[];
+          statusMap[s.bookSourceName] = 'error';
+        }
+        aggregated.addAll(list);
+        completed++;
+        report();
       }
-      aggregated.addAll(list);
-      completed++;
-      report();
-    }).toList();
+    }
 
-    await Future.wait(futures);
+    final workerCount = concurrency < total ? concurrency : total;
+    await Future.wait(List.generate(workerCount, (_) => worker()));
     return _mergeAndDedupe(aggregated);
   }
 

@@ -255,6 +255,7 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('书架'),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: _checkingUpdates
@@ -266,11 +267,6 @@ class _BookshelfPageState extends ConsumerState<BookshelfPage> {
                 : const Icon(Icons.refresh),
             tooltip: '检查更新',
             onPressed: _checkingUpdates ? null : _checkUpdates,
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: '设置',
-            onPressed: () => context.push('/settings'),
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.tune),

@@ -34,8 +34,16 @@ final appRouter = GoRouter(
           builder: (context, state) => const BookshelfPage(),
         ),
         GoRoute(
+          path: '/discover',
+          builder: (context, state) => const DiscoverPage(),
+        ),
+        GoRoute(
           path: '/search',
           builder: (context, state) => const SearchPage(),
+        ),
+        GoRoute(
+          path: '/me',
+          builder: (context, state) => const SettingsPage(),
         ),
         GoRoute(
           path: '/book',
@@ -66,10 +74,6 @@ final appRouter = GoRouter(
       builder: (context, state) => const ReadingHistoryPage(),
     ),
     GoRoute(
-      path: '/discover',
-      builder: (context, state) => const DiscoverPage(),
-    ),
-    GoRoute(
       path: '/explore',
       builder: (context, state) => const ExploreSourcePage(),
     ),
@@ -83,9 +87,11 @@ final appRouter = GoRouter(
         return ExploreCategoryPage(source: source);
       },
     ),
+    // /discover 与 /settings 已并入主页 4 Tab（/discover、/me），
+    // 保留 /settings 兼容旧链接跳转到 /me。
     GoRoute(
       path: '/settings',
-      builder: (context, state) => const SettingsPage(),
+      redirect: (context, state) => '/me',
     ),
     GoRoute(
       path: '/backup',
@@ -114,30 +120,32 @@ final appRouter = GoRouter(
   ],
 );
 
-/// 主页底部导航容器：书架 / 搜书。
+/// 主页底部导航容器：书架 / 发现 / 搜书 / 我的。
 ///
 /// 详情页 /book 也包含在 Shell 内，方便用户随时切到书架查看收藏。
 class _HomeShell extends StatelessWidget {
   final Widget child;
   const _HomeShell({required this.child});
 
-  /// 底部导航 tab：路径前缀 + 图标。
-  static const _tabs = <(String, IconData)>[
-    ('/shelf', Icons.bookmark),
-    ('/search', Icons.search),
+  /// 底部导航 tab：路径前缀。
+  static const _tabs = <String>[
+    '/shelf',
+    '/discover',
+    '/search',
+    '/me',
   ];
 
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
     // 详情页 /book 不属于任何 tab，回落到搜书（更常见的来源）
-    int idx = _tabs.indexWhere((t) => location.startsWith(t.$1));
-    if (idx < 0) idx = 1; // 默认搜书
+    int idx = _tabs.indexWhere((t) => location.startsWith(t));
+    if (idx < 0) idx = 2; // 默认搜书
     return Scaffold(
       body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: idx,
-        onDestinationSelected: (i) => context.go(_tabs[i].$1),
+        onDestinationSelected: (i) => context.go(_tabs[i]),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.bookmark_border_outlined),
@@ -145,9 +153,19 @@ class _HomeShell extends StatelessWidget {
             label: '书架',
           ),
           NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore_rounded),
+            label: '发现',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.search_outlined),
             selectedIcon: Icon(Icons.search_rounded),
             label: '搜书',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline_rounded),
+            selectedIcon: Icon(Icons.person_rounded),
+            label: '我的',
           ),
         ],
       ),

@@ -22,7 +22,7 @@ class SettingsPage extends ConsumerWidget {
     final prefs = ref.watch(themePrefsProvider);
     final notifier = ref.read(themePrefsProvider.notifier);
     return Scaffold(
-      appBar: AppBar(title: const Text('设置')),
+      appBar: AppBar(title: const Text('我的')),
       body: ListView(
         children: [
           _SectionHeader(title: '阅读'),
@@ -32,13 +32,6 @@ class SettingsPage extends ConsumerWidget {
             subtitle: const Text('添加、编辑、测试书源'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/book-sources'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.explore_outlined),
-            title: const Text('发现 / 排行'),
-            subtitle: const Text('浏览各书源热门榜单'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/discover'),
           ),
           ListTile(
             leading: const Icon(Icons.library_books),
