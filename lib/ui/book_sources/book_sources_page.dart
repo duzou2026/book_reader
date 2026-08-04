@@ -437,6 +437,40 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
     _exitSelectMode();
   }
 
+  /// 清除所有书源。
+  Future<void> _clearAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('清除所有书源'),
+        content: const Text(
+          '确定清除所有书源？此操作不可撤销。清除后可通过「同步云端定制书源」重新导入。',
+          style: TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('清除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(bookSourceRepositoryProvider).clear();
+    if (!mounted) return;
+    setState(_reload);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已清除所有书源')),
+    );
+  }
+
   /// 导出选中（或全部）书源为 JSON。
   Future<void> _exportSources(List<BookSource> all,
       {bool onlySelected = true}) async {
@@ -708,6 +742,11 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                   icon: const Icon(Icons.add),
                   onPressed: _openImport,
                   tooltip: '粘贴 JSON 导入',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_sweep_outlined),
+                  onPressed: _lastList.isEmpty ? null : _clearAll,
+                  tooltip: '清除所有书源',
                 ),
               ],
       ),
