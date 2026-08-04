@@ -6,6 +6,7 @@ import 'package:book_reader/services/http/book_source_fetcher.dart';
 import 'package:book_reader/services/http/dio_book_source_fetcher.dart';
 import 'package:book_reader/services/rule_engine/rule_engine.dart';
 import 'package:book_reader/services/search/search_url_parser.dart';
+import 'package:flutter/foundation.dart';
 
 /// 单源搜索器。
 ///
@@ -28,7 +29,10 @@ class SingleSourceSearcher {
   Future<List<SearchResult>> search(String keyword, BookSource source) async {
     final searchUrl = source.searchUrl;
     final rule = source.ruleSearch;
-    if (searchUrl == null || rule == null) return [];
+    if (searchUrl == null || rule == null) {
+      debugPrint('[搜索] ${source.bookSourceName}: 无 searchUrl 或 ruleSearch，跳过');
+      return [];
+    }
 
     // 解析 searchUrl：支持 url,{json} 配置段、POST 请求、@js:url="..." 静态提取
     final config = SearchUrlParser.parse(
@@ -38,9 +42,10 @@ class SingleSourceSearcher {
       baseUrl: source.bookSourceUrl,
     );
     if (config == null) {
-      // 复杂 @js: 规则等暂不支持，跳过
+      debugPrint('[搜索] ${source.bookSourceName}: searchUrl 解析失败，跳过');
       return [];
     }
+    debugPrint('[搜索] ${source.bookSourceName}: URL=${config.url}, method=${config.method}, body=${config.body}, charset=${config.charset}');
 
     final String body;
     try {
@@ -52,15 +57,17 @@ class SingleSourceSearcher {
         // 退化为普通 GET（非 Dio 实现时）
         body = await fetcher.fetch(config.url, source: source);
       }
-    } catch (_) {
-      // 网络失败/超时 → 该源返回空
+    } catch (e) {
+      debugPrint('[搜索] ${source.bookSourceName}: 请求失败: $e');
       return [];
     }
+    debugPrint('[搜索] ${source.bookSourceName}: 响应长度=${body.length}');
 
     // 反爬验证页检测：部分站点（如起点）对无 Cookie 请求返回 JS 验证页，
     // 特征是 HTTP 202 + 短响应 + 含 'var buid' 等验证标识。
     // 这种情况下搜索结果必然为空，直接返回避免浪费后续解析时间。
     if (_isAntiCrawlPage(body)) {
+      debugPrint('[搜索] ${source.bookSourceName}: 检测到反爬验证页，跳过');
       return [];
     }
 
@@ -69,6 +76,7 @@ class SingleSourceSearcher {
 
     // bookList 规则：可能是 CSS / legado 旧式 / XPath / JSON
     var elements = ruleEngine.evalElements(body, bookListRule);
+    debugPrint('[搜索] ${source.bookSourceName}: bookList=$bookListRule, 匹配元素数=${elements.length}');
 
     // <js> bookList fallback：当 bookList 是 <js> 规则且返回空时，
     // 尝试从 JS 代码中提取 CSS 选择器（如 path='class.res-book-item'），
@@ -96,10 +104,12 @@ class SingleSourceSearcher {
 
     final results = <SearchResult>[];
     final keywordNorm = _normalize(keyword);
+    debugPrint('[搜索] ${source.bookSourceName}: 关键词归一化=$keywordNorm');
     for (final element in elements) {
       final name = _evalField(element, rule.name);
       final bookUrl = _evalField(element, rule.bookUrl);
       if (name == null || name.isEmpty || bookUrl == null || bookUrl.isEmpty) {
+        debugPrint('[搜索] ${source.bookSourceName}: 跳过空名称/链接的结果 name=$name, bookUrl=$bookUrl');
         continue;
       }
 
@@ -114,9 +124,12 @@ class SingleSourceSearcher {
       // 部分书源搜索逻辑宽松，会返回与关键字无关的结果（如把关键字当拼音/模糊
       // 匹配返回热门书），导致用户搜「让存在感消失的手链」却搜出同名无关的
       // 1024 章小说。这里做一道兜底过滤，避免明显不相关的结果污染列表。
-      if (!_isRelevant(name, author, keywordNorm)) {
+      final relevant = _isRelevant(name, author, keywordNorm);
+      if (!relevant) {
+        debugPrint('[搜索] ${source.bookSourceName}: 相关性过滤排除 name=$name, author=$author');
         continue;
       }
+      debugPrint('[搜索] ${source.bookSourceName}: 匹配结果 name=$name, author=$author, bookUrl=$bookUrl');
 
       final absoluteBookUrl = _resolveUrl(bookUrl, source.bookSourceUrl);
       final absoluteCoverUrl =

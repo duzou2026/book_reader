@@ -115,7 +115,18 @@ class DioBookSourceFetcher implements BookSourceFetcher {
   }
 
   /// 按 charset 编码 POST body。
+  ///
+  /// 对于 `application/x-www-form-urlencoded` 格式的 body（如 `key1=val1&key2=val2`），
+  /// 按标准做法：对每个参数值先用 [charset] 编码，再做 percent-encode（URL 编码），
+  /// 最后拼接为 body 字符串并编码为 ASCII 字节。
+  ///
+  /// 非 form 格式的 body（如 JSON）直接按 charset 编码。
   List<int> _encodeBody(String body, String? charset) {
+    // 判断是否是 form 格式（含 = 和 &）
+    if (body.contains('=') && (body.contains('&') || body.startsWith('s='))) {
+      return _encodeFormBody(body, charset);
+    }
+    // 非 form 格式，直接编码
     switch (charset?.toLowerCase()) {
       case 'gbk':
       case 'gb2312':
@@ -128,6 +139,63 @@ class DioBookSourceFetcher implements BookSourceFetcher {
       default:
         return utf8.encode(body);
     }
+  }
+
+  /// URL 编码 form body 的参数值。
+  List<int> _encodeFormBody(String body, String? charset) {
+    final pairs = body.split('&');
+    final encoded = <String>[];
+    for (final pair in pairs) {
+      final eqIdx = pair.indexOf('=');
+      if (eqIdx < 0) {
+        encoded.add(pair);
+        continue;
+      }
+      final key = pair.substring(0, eqIdx);
+      final value = pair.substring(eqIdx + 1);
+      // 对 value 按 charset 编码后再 percent-encode
+      final valueBytes = _encodeString(value, charset);
+      final percentEncoded = _percentEncode(valueBytes);
+      encoded.add('$key=$percentEncoded');
+    }
+    return utf8.encode(encoded.join('&'));
+  }
+
+  /// 按 charset 编码字符串为字节。
+  List<int> _encodeString(String s, String? charset) {
+    switch (charset?.toLowerCase()) {
+      case 'gbk':
+      case 'gb2312':
+      case 'gb18030':
+        try {
+          return gbk.encode(s);
+        } catch (_) {
+          return utf8.encode(s);
+        }
+      default:
+        return utf8.encode(s);
+    }
+  }
+
+  /// percent-encode（URL 编码）字节序列。
+  ///
+  /// 与 Dart 内置的 `Uri.encodeQueryComponent` 不同的是，这里按实际字节编码，
+  /// 而非按 UTF-8。对于 GBK 等非 UTF-8 编码，必须手动编码。
+  String _percentEncode(List<int> bytes) {
+    final buf = StringBuffer();
+    for (final b in bytes) {
+      // RFC 3986 unreserved: A-Z, a-z, 0-9, -, _, ., ~
+      if ((b >= 0x41 && b <= 0x5A) || // A-Z
+          (b >= 0x61 && b <= 0x7A) || // a-z
+          (b >= 0x30 && b <= 0x39) || // 0-9
+          b == 0x2D || b == 0x5F || b == 0x2E || b == 0x7E) {
+        buf.writeCharCode(b);
+      } else {
+        buf.write('%');
+        buf.write(b.toRadixString(16).padLeft(2, '0').toUpperCase());
+      }
+    }
+    return buf.toString();
   }
 
   /// 探测响应内容的字符编码。
