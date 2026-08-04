@@ -65,52 +65,10 @@ class RemoteBookSources {
   /// community_sources.json 而非复用旧缓存。
   static const String cacheKey = 'community_sources';
 
-  /// 从远程拉取最新书源，写入缓存并返回。
-  ///
-  /// [forceRefresh]：
-  ///   - false（默认）：先尝试缓存，无缓存才联网
-  ///   - true：跳过缓存，强制联网拉取最新
-  ///
-  /// 失败时：
-  ///   - 网络错误 / 解析失败 → 回退到缓存（若有）→ 否则返回空列表
+  /// 已禁用：根据用户要求，禁止使用公开书源。
+  /// 仅使用用户指定的定制书源（见 [recommendedBookSourceJson]）。
+  /// 永远返回空列表。
   Future<List<BookSource>> fetch({bool forceRefresh = false}) async {
-    if (!forceRefresh) {
-      final cached = _readCache();
-      if (cached != null) return cached;
-    }
-    // 多镜像逐个尝试，任一成功即返回
-    Object? lastError;
-    for (final url in remoteUrls) {
-      try {
-        final response = await _dio.get<dynamic>(
-          url,
-          options: Options(
-            responseType: ResponseType.plain,
-            // 单镜像超时设短一点，失败快速切下一个镜像
-            connectTimeout: const Duration(seconds: 8),
-            receiveTimeout: const Duration(seconds: 15),
-          ),
-        );
-        final body = response.data;
-        if (body is! String || body.isEmpty) {
-          throw FormatException('远程书源响应为空');
-        }
-        final sources = _parseJson(body);
-        if (sources.isEmpty) {
-          throw FormatException('远程书源解析为空列表');
-        }
-        await _writeCache(body);
-        return sources;
-      } catch (e) {
-        lastError = e;
-        debugPrint('镜像拉取失败 $url：$e');
-        // 当前镜像失败，尝试下一个
-      }
-    }
-    debugPrint('所有镜像拉取均失败：$lastError');
-    // 全部镜像失败 → 回退缓存
-    final cached = _readCache();
-    if (cached != null) return cached;
     return const [];
   }
 

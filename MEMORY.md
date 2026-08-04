@@ -51,13 +51,57 @@ Gitee 上传失败时，手动触发 workflow_dispatch，输入 tag（如 `v0.5.
 - HTML 渲染：flutter_html（书籍简介含 `<br>` 等标签，需富文本渲染）
 - 主题：Material 3 + ColorScheme.fromSeed（默认 teal `0xFF00897B`）
 
-## 书源
+## 书源（重要约定）
 
+### 禁止使用公开书源
+- **严禁**再使用任何公开书源（包括 legado 社区书源、GitHub 远程书源等）
+- `RemoteBookSources` 已被禁用，永远返回空列表
+- 仅允许使用**用户指定提供的定制书源**
+
+### 内置定制书源
+定制书源写死在 `lib/data/demo_book_sources.dart` 的 `recommendedBookSourceJson` 中，
+作为唯一默认书源。用户添加的书源存储在 Hive `book_sources` box 中。
+
+### 歪歪小说网（当前唯一内置书源）
+- 网址：http://m.waiwaixs.com
+- 编码：GBK（POST 请求体和响应均需 GBK 编解码）
+- 书源 JSON：
+```json
+{
+  "bookSourceName": "歪歪小说网",
+  "bookSourceUrl": "http://m.waiwaixs.com",
+  "bookSourceType": 0,
+  "enabled": true,
+  "searchUrl": "http://m.waiwaixs.com/s.php,{\"method\":\"POST\",\"body\":\"s={{key}}&type=articlename\",\"charset\":\"gbk\"}",
+  "ruleSearch": {
+    "bookList": "p.line",
+    "name": "tag.a.0@text",
+    "author": "text##.*作者[::]",
+    "bookUrl": "tag.a.0@href"
+  },
+  "ruleBookInfo": {
+    "name": "//meta[@property='og:novel:book_name']/@content",
+    "author": "//meta[@property='og:novel:author']/@content",
+    "coverUrl": "//meta[@property='og:image']/@content",
+    "tocUrl": "//meta[@property='og:novel:read_url']/@content",
+    "intro": "//meta[@property='og:description']/@content"
+  },
+  "ruleToc": {
+    "chapterList": "ul.chapter li",
+    "chapterName": "tag.a.0@text",
+    "chapterUrl": "tag.a.0@href"
+  },
+  "ruleContent": {
+    "content": "css:#nr.nr_nr #nr1@html"
+  }
+}
+```
+
+### 格式与解析
 - 格式：legado 书源 JSON
-- 拉取：`RemoteBookSources` 从 GitHub 仓库远程拉取，缓存到独立 Box
-  （**不能**写回 `book_sources` box，否则 List JSON 会污染导致 `getAll()` 崩溃）
-- 规则解析：`RuleEngine`，支持 `@js:`、`@css:`、XPath 等
-- 当前维护的书源：见 `lib/data/remote_book_sources.dart`
+- 规则解析：`RuleEngine`，支持 `@js:`、`@css:`、XPath、Legado 旧式语法（tag/class/id）
+- POST + GBK 编码：在 `searchUrl` 中通过 `,{...}` JSON 配置段指定 `method`、`body`、`charset`
+- 编码处理：`DioBookSourceFetcher` 支持 `gbk/gb2312/gb18030` 编解码
 
 ## 常见坑
 

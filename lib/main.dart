@@ -35,9 +35,8 @@ Future<void> main() async {
   // 导致 HiveBookSourceRepository.getAll() 遍历到该 value 时
   // `as Map<String, dynamic>` 崩溃。改用独立 cache box 后需清理脏数据。
   await _migrateCleanStaleCacheKey(bookSourceBox);
-  // 首次启动：从 GitHub 仓库远程拉取书源写入 Hive
+  // 首次启动：写入用户定制的内置书源（禁止使用公开书源，见 MEMORY.md）
   // - 已有书源的用户不会再次写入，避免覆盖用户配置
-  // - 拉取失败时静默忽略，App 仍能启动（用户可在书源管理页点「刷新书源」重试）
   await _seedRemoteBookSources(bookSourceBox, bookSourcesCacheBox);
   runApp(
     ProviderScope(
@@ -59,14 +58,11 @@ Future<void> main() async {
   );
 }
 
-/// 仅在 `book_sources` Box 为空时，从远程仓库拉取书源写入。
+/// 仅在 `book_sources` Box 为空时，写入内置定制书源。
 ///
-/// 流程：
-///   1. Box 非空 → 已有书源（用户配置过），跳过
-///   2. Box 为空 → 通过 [RemoteBookSources] 拉取远程 JSON
-///      - 拉取成功 → 缓存到独立的 [cacheBox] + 逐条写入各书源 URL 到 [box]
-///      - 拉取失败 → 用内置 [recommendedBookSourceJson] 兜底写入 2 条精简源
-///        （断网/被墙/Gitee 故障时仍能保证基础搜索能力，用户可在书源管理页刷新补全）
+/// 约定（MEMORY.md）：禁止使用公开书源，仅使用用户指定提供的定制书源。
+/// `RemoteBookSources.fetch()` 已被禁用（永远返回空），因此这里始终走
+/// `_seedBuiltinSources` 路径，写入 [recommendedBookSourceJson] 中的定制书源。
 Future<void> _seedRemoteBookSources(
     Box<String> box, Box<String> cacheBox) async {
   try {
@@ -88,10 +84,10 @@ Future<void> _seedRemoteBookSources(
   }
 }
 
-/// 写入内置兜底书源（[recommendedBookSourceJson]）。
+/// 写入内置定制书源（[recommendedBookSourceJson]）。
 ///
-/// 仅在远程拉取失败时调用，保证用户首次启动至少有 2 条可用源可搜索。
-/// 用户后续可在「书源管理页 → 刷新书源」拉取完整列表覆盖。
+/// 仅在 Box 为空时调用，保证用户首次启动有可用的定制书源。
+/// 禁止使用公开书源，详见 MEMORY.md。
 Future<void> _seedBuiltinSources(Box<String> box) async {
   try {
     if (box.isNotEmpty) return;

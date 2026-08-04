@@ -1,75 +1,39 @@
-/// 推荐导入的真实书源 JSON（legado 兼容格式）。
+/// 用户定制书源 JSON（legado 兼容格式）。
 ///
-/// 与 [RemoteBookSources] 的关系：
-/// - [RemoteBookSources] 从 GitHub 仓库拉取完整书源列表（约 26 条）
-/// - 此常量是「书源管理页 → 导入推荐书源」按钮使用的 JSON 字符串
-///   作为离线兜底（用户断网时也能手动导入 2 条精简版）
+/// 重要约定（见 MEMORY.md）：
+/// - 禁止使用公开书源，仅使用用户指定提供的定制书源
+/// - 此常量为唯一内置默认书源，用户在书源管理页可手动导入
 ///
-/// 这里只放一份精简版，完整版见仓库 `book_sources/xiu2_sources.json`。
+/// 当前内置书源：歪歪小说网（http://m.waiwaixs.com）
 const String recommendedBookSourceJson = r'''
 [
   {
-    "bookSourceName": "铅笔小说",
-    "bookSourceUrl": "https://www.23qb.com",
+    "bookSourceName": "歪歪小说网",
+    "bookSourceUrl": "http://m.waiwaixs.com",
     "bookSourceType": 0,
     "enabled": true,
-    "bookSourceGroup": "推荐",
-    "searchUrl": "/search.html?searchkey={{key}}",
+    "bookSourceGroup": "定制",
+    "searchUrl": "http://m.waiwaixs.com/s.php,{\"method\":\"POST\",\"body\":\"s={{key}}&type=articlename\",\"charset\":\"gbk\"}",
     "ruleSearch": {
-      "bookList": "class.module-search-item",
-      "bookUrl": "tag.a.0@href",
-      "coverUrl": "tag.img.0@data-src",
-      "intro": "class.novel-info-item.0@text",
-      "kind": "class.tag-link.0@tag.span.0@text## ##,",
-      "name": "tag.a.0@title"
+      "bookList": "p.line",
+      "name": "tag.a.0@text",
+      "author": "text##.*作者[::]",
+      "bookUrl": "tag.a.0@href"
     },
     "ruleBookInfo": {
+      "name": "//meta[@property='og:novel:book_name']/@content",
       "author": "//meta[@property='og:novel:author']/@content",
       "coverUrl": "//meta[@property='og:image']/@content",
-      "intro": "//meta[@property='og:description']/@content",
-      "kind": "//meta[@property='og:novel:tags']/@content",
-      "lastChapter": "//meta[@property='og:novel:latest_chapter_name']/@content",
-      "name": "//meta[@property='og:novel:book_name']/@content",
-      "tocUrl": "class.catalog-more.0@href",
-      "wordCount": "class.novel-info-aux.0@tag.span.-1@text"
+      "tocUrl": "//meta[@property='og:novel:read_url']/@content",
+      "intro": "//meta[@property='og:description']/@content"
     },
     "ruleToc": {
-      "chapterList": "class.module-row-text",
-      "chapterName": "tag.span.0@text",
-      "chapterUrl": "href"
+      "chapterList": "ul.chapter li",
+      "chapterName": "tag.a.0@text",
+      "chapterUrl": "tag.a.0@href"
     },
     "ruleContent": {
-      "content": "class.article-content.0@html##\\(本章完\\)"
-    }
-  },
-  {
-    "bookSourceName": "八一中文",
-    "bookSourceUrl": "https://www.81zw2.com",
-    "bookSourceType": 0,
-    "enabled": true,
-    "bookSourceGroup": "推荐",
-    "searchUrl": "https://www.81zw2.com/s.php?q={{key}}",
-    "ruleSearch": {
-      "bookList": "css:.book-list > li",
-      "name": "css:.book-name@text",
-      "author": "css:.author@text",
-      "bookUrl": "css:a@href"
-    },
-    "ruleBookInfo": {
-      "name": "css:h1@text",
-      "author": "css:.book-info p:contains(作者)@text##.*作者[::]",
-      "intro": "css:.intro@text",
-      "coverUrl": "css:.book-cover img@src",
-      "lastChapter": "css:.book-info p:contains(最新)@text##.*最新[::]",
-      "wordCount": "css:.book-info p:contains(字数)@text##.*字数[::]"
-    },
-    "ruleToc": {
-      "chapterList": "css:.chapter-list li",
-      "chapterName": "css:a@text",
-      "chapterUrl": "css:a@href"
-    },
-    "ruleContent": {
-      "content": "css:.chapter-content@html"
+      "content": "css:#nr.nr_nr #nr1@html"
     }
   }
 ]

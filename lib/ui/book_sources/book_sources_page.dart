@@ -13,13 +13,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-/// 从 GitHub 仓库远程刷新书源：拉取最新 JSON → upsert 到 Hive。
+/// 书源管理页（禁止使用公开书源，详见 MEMORY.md）。
 ///
-/// 与「导入推荐书源」的区别：
-/// - 推荐书源是 [recommendedBookSourceJson] 常量，离线可用，但只有 2 条精简版
-/// - 远程刷新从 GitHub 仓库 `book_sources/xiu2_sources.json` 拉取完整版（26 条）
+/// 书源来源：
+/// - 内置定制书源：[recommendedBookSourceJson] 常量中的用户定制书源
+/// - 用户手动添加/粘贴的书源
 ///
-/// 维护方式：新增/删除书源只需修改 GitHub 仓库的 JSON 文件即可。
+/// 「刷新书源」按钮已改为重新导入内置定制书源。
+/// 「导入推荐书源」按钮导入内置定制书源（歪歪小说网等用户指定书源）。
 
 class BookSourcesPage extends ConsumerStatefulWidget {
   const BookSourcesPage({super.key});
@@ -69,19 +70,17 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
     }
   }
 
-  /// 一键导入内置推荐书源 JSON（legado 兼容格式）。
+  /// 一键导入内置定制书源 JSON（legado 兼容格式）。
   ///
   /// 与「粘贴 JSON 导入」对话框的区别：
-  /// - 这里直接使用 [recommendedBookSourceJson] 中的模板，无需用户复制粘贴
-  /// - 用户可在导入后再编辑具体规则或替换为最新订阅
+  /// - 这里直接使用 [recommendedBookSourceJson] 中的用户定制书源
   Future<void> _importRecommended() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('导入推荐书源', style: TextStyle(fontSize: 16)),
+        title: const Text('导入内置定制书源', style: TextStyle(fontSize: 16)),
         content: const Text(
-          '将导入 2 个内置推荐书源模板（笔趣阁、起点中文网），'
-          '导入后可在书源管理页编辑具体规则或替换为最新 legado 书源订阅链接。',
+          '将导入用户定制的书源（歪歪小说网等），导入后可在书源管理页编辑。',
           style: TextStyle(fontSize: 13),
         ),
         actions: [
@@ -108,7 +107,7 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
       if (!mounted) return;
       setState(_reload);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已导入 ${sources.length} 个推荐书源')),
+        SnackBar(content: Text('已导入 ${sources.length} 个定制书源')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -118,11 +117,10 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
     }
   }
 
-  /// 从 GitHub 仓库远程刷新书源。
+  /// 重新导入内置定制书源（禁止使用公开书源，详见 MEMORY.md）。
   ///
-  /// - 拉取最新 JSON → upsert 到 Hive（已有同 URL 的会被覆盖）
-  /// - 拉取失败时给出明确提示（断网 / GitHub 不可访问）
-  /// - 成功后自动刷新列表
+  /// - 从 [recommendedBookSourceJson] 常量导入用户指定的定制书源
+  /// - 已有同 URL 的会被覆盖
   Future<void> _refreshRemoteSources() async {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -134,20 +132,20 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             SizedBox(width: 12),
-            Text('正在从 Gitee 拉取书源...'),
+            Text('正在导入内置定制书源...'),
           ],
         ),
         duration: Duration(seconds: 30),
       ),
     );
     try {
-      final fetcher = ref.read(remoteBookSourcesProvider);
-      final sources = await fetcher.fetch(forceRefresh: true);
+      final sources = BookSourceImporter()
+          .parse(recommendedBookSourceJson, throwOnInvalid: false);
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       if (sources.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('未拉取到书源，请检查网络')),
+          const SnackBar(content: Text('未找到内置定制书源')),
         );
         return;
       }
@@ -158,13 +156,13 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
       if (!mounted) return;
       setState(_reload);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已刷新 ${sources.length} 个书源')),
+        SnackBar(content: Text('已导入 ${sources.length} 个定制书源')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('刷新失败：$e')),
+        SnackBar(content: Text('导入失败：$e')),
       );
     }
   }
@@ -694,12 +692,12 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                 IconButton(
                   icon: const Icon(Icons.cloud_download_outlined),
                   onPressed: _refreshRemoteSources,
-                  tooltip: '从 Gitee 刷新书源',
+                  tooltip: '导入内置定制书源',
                 ),
                 IconButton(
                   icon: const Icon(Icons.recommend_outlined),
                   onPressed: _importRecommended,
-                  tooltip: '导入推荐书源',
+                  tooltip: '导入定制书源',
                 ),
                 IconButton(
                   icon: const Icon(Icons.ios_share),
@@ -733,7 +731,7 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                   FilledButton.icon(
                     onPressed: _importRecommended,
                     icon: const Icon(Icons.recommend_outlined),
-                    label: const Text('导入推荐书源'),
+                    label: const Text('导入定制书源'),
                   ),
                   const SizedBox(height: 8),
                   TextButton.icon(
