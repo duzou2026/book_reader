@@ -58,11 +58,12 @@ Future<void> main() async {
   );
 }
 
-/// 仅在 `book_sources` Box 为空时，写入内置定制书源。
+/// 仅在 `book_sources` Box 为空时，从远程仓库拉取用户定制书源。
 ///
-/// 约定（MEMORY.md）：禁止使用公开书源，仅使用用户指定提供的定制书源。
-/// `RemoteBookSources.fetch()` 已被禁用（永远返回空），因此这里始终走
-/// `_seedBuiltinSources` 路径，写入 [recommendedBookSourceJson] 中的定制书源。
+/// 约定（MEMORY.md）：
+/// - 禁止使用 legado 公开书源
+/// - 从仓库 `book_sources/custom_sources.json` 拉取用户定制书源
+/// - 拉取失败时用 [recommendedBookSourceJson] 内置兜底
 Future<void> _seedRemoteBookSources(
     Box<String> box, Box<String> cacheBox) async {
   try {

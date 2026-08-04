@@ -117,9 +117,9 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
     }
   }
 
-  /// 重新导入内置定制书源（禁止使用公开书源，详见 MEMORY.md）。
+  /// 从远程仓库刷新用户定制书源（禁止使用 legado 公开书源，详见 MEMORY.md）。
   ///
-  /// - 从 [recommendedBookSourceJson] 常量导入用户指定的定制书源
+  /// - 从 GitHub/Gitee 仓库 `book_sources/custom_sources.json` 拉取
   /// - 已有同 URL 的会被覆盖
   Future<void> _refreshRemoteSources() async {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -132,20 +132,20 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             SizedBox(width: 12),
-            Text('正在导入内置定制书源...'),
+            Text('正在同步云端定制书源...'),
           ],
         ),
         duration: Duration(seconds: 30),
       ),
     );
     try {
-      final sources = BookSourceImporter()
-          .parse(recommendedBookSourceJson, throwOnInvalid: false);
+      final fetcher = ref.read(remoteBookSourcesProvider);
+      final sources = await fetcher.fetch(forceRefresh: true);
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       if (sources.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('未找到内置定制书源')),
+          const SnackBar(content: Text('未拉取到定制书源，请检查网络')),
         );
         return;
       }
@@ -156,13 +156,13 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
       if (!mounted) return;
       setState(_reload);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已导入 ${sources.length} 个定制书源')),
+        SnackBar(content: Text('已同步 ${sources.length} 个定制书源')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导入失败：$e')),
+        SnackBar(content: Text('同步失败：$e')),
       );
     }
   }
@@ -692,7 +692,7 @@ class _BookSourcesPageState extends ConsumerState<BookSourcesPage> {
                 IconButton(
                   icon: const Icon(Icons.cloud_download_outlined),
                   onPressed: _refreshRemoteSources,
-                  tooltip: '导入内置定制书源',
+                  tooltip: '同步云端定制书源',
                 ),
                 IconButton(
                   icon: const Icon(Icons.recommend_outlined),

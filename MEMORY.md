@@ -53,16 +53,21 @@ Gitee 上传失败时，手动触发 workflow_dispatch，输入 tag（如 `v0.5.
 
 ## 书源（重要约定）
 
-### 禁止使用公开书源
-- **严禁**再使用任何公开书源（包括 legado 社区书源、GitHub 远程书源等）
-- `RemoteBookSources` 已被禁用，永远返回空列表
+### 禁止使用 legado 公开书源
+- **严禁**使用 legado 社区公开书源（`community_sources.json`）
 - 仅允许使用**用户指定提供的定制书源**
+- 定制书源存储在仓库 `book_sources/custom_sources.json`
 
-### 内置定制书源
-定制书源写死在 `lib/data/demo_book_sources.dart` 的 `recommendedBookSourceJson` 中，
-作为唯一默认书源。用户添加的书源存储在 Hive `book_sources` box 中。
+### 云端同步机制（保留）
+- `RemoteBookSources` 从仓库拉取 `custom_sources.json`（定制书源）
+- 多镜像：Gitee raw → GitHub raw → jsDelivr CDN
+- 缓存 key：`custom_sources`（Hive `book_sources_cache` box）
 
-### 歪歪小说网（当前唯一内置书源）
+### 内置兜底书源
+- 离线兜底：`lib/data/demo_book_sources.dart` 的 `recommendedBookSourceJson`
+- 远程拉取失败时用内置兜底，保证基础搜索能力
+
+### 歪歪小说网（当前定制书源）
 - 网址：http://m.waiwaixs.com
 - 编码：GBK（POST 请求体和响应均需 GBK 编解码）
 - 书源 JSON：
@@ -72,6 +77,7 @@ Gitee 上传失败时，手动触发 workflow_dispatch，输入 tag（如 `v0.5.
   "bookSourceUrl": "http://m.waiwaixs.com",
   "bookSourceType": 0,
   "enabled": true,
+  "bookSourceGroup": "定制",
   "searchUrl": "http://m.waiwaixs.com/s.php,{\"method\":\"POST\",\"body\":\"s={{key}}&type=articlename\",\"charset\":\"gbk\"}",
   "ruleSearch": {
     "bookList": "p.line",
